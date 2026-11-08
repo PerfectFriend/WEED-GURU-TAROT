@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with credits, preferences, and netrunner stats",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "weed": { "type": "number" },
+        "avatarIndex": { "type": "number" },
+        "systemLanguage": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "username", "weed"]
+    },
+    "TarotReading": {
+      "title": "TarotReading",
+      "description": "Divination matrix reading",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "question": { "type": "string" },
+        "cardIndices": { "type": "array" },
+        "isUpright": { "type": "array" },
+        "report": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "userId", "question", "report", "timestamp"]
+    },
+    "MarketListing": {
+      "title": "MarketListing",
+      "description": "NFT or card listing on DEX",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "cardIndex": { "type": "number" },
+        "price": { "type": "number" },
+        "timestamp": { "type": "number" },
+        "isSold": { "type": "boolean" }
+      },
+      "required": ["id", "sellerId", "cardIndex", "price", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document owned by the user"
+    },
+    "/users/{userId}/readings/{readingId}": {
+      "schema": "TarotReading",
+      "description": "Tarot reading records owned by the user"
+    },
+    "/market/{listingId}": {
+      "schema": "MarketListing",
+      "description": "Public marketplace listings"
+    }
+  }
+}

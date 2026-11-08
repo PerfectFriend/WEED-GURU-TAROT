@@ -1,0 +1,683 @@
+/* CYBER TAROT DECK - DIGITAL CIRCUITRY STYLE SPECIFICATION */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Space+Grotesk:wght@400;700&display=swap');
+
+:root {
+  /* Color Palettes */
+  --bg-darker: #05050c;
+  --bg-dark: #0a0a16;
+  --bg-card: #121225;
+  --bg-card-hover: #181835;
+  --cyber-gray: #7a7a9a;
+
+  /* Neon Glow Values */
+  --neon-magenta: #ff00ff;
+  --neon-cyan: #00ffff;
+  --neon-green: #39ff14;
+  --neon-gold: #ffa500;
+  --neon-red: #ff3333;
+
+  /* Fonts */
+  --font-display: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  background-color: var(--bg-darker);
+  color: #ffffff;
+  font-family: var(--font-display);
+  margin: 0;
+  padding: 0;
+}
+
+/* Container & Header Layout */
+.cyber-deck-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  box-sizing: border-box;
+}
+
+.cyber-deck-header {
+  text-align: center;
+  margin-bottom: 40px;
+  border-bottom: 2px solid rgba(255, 0, 255, 0.15);
+  padding-bottom: 30px;
+}
+
+.cyber-deck-header h1 {
+  font-size: 3rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  margin: 0 0 8px 0;
+}
+
+.cyber-deck-header .subtitle {
+  font-family: var(--font-mono);
+  color: var(--neon-cyan);
+  font-size: 0.95rem;
+  letter-spacing: 4px;
+  margin: 0;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
+}
+
+.header-stats {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  margin-top: 25px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.stat-node {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 16px;
+  border-radius: 6px;
+}
+
+.stat-node span {
+  color: var(--neon-green);
+  font-weight: 700;
+  text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
+}
+
+/* Control Console Styles */
+.control-console {
+  background: var(--bg-card);
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 40px;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 30px;
+}
+
+@media (max-width: 1024px) {
+  .control-console {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.control-console label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 2px;
+  color: var(--cyber-gray);
+  margin-bottom: 12px;
+}
+
+.control-console input[type="text"] {
+  width: 100%;
+  background: var(--bg-darker);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 14px 18px;
+  border-radius: 8px;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+.control-console input[type="text"]:focus {
+  border-color: var(--neon-magenta);
+  box-shadow: 0 0 15px rgba(255, 0, 255, 0.2);
+}
+
+.button-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button-grid button {
+  background: var(--bg-darker);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--cyber-gray);
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.button-grid button:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.button-grid button.active {
+  background: var(--neon-cyan);
+  color: var(--bg-darker);
+  font-weight: 700;
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+}
+
+/* Card Rarity Customizer Color Bindings */
+.button-grid button.active.button-legend {
+  background: var(--neon-gold);
+  border-color: var(--neon-gold);
+  box-shadow: 0 0 15px rgba(255, 165, 0, 0.4);
+}
+.button-grid button.active.button-epic {
+  background: var(--neon-magenta);
+  border-color: var(--neon-magenta);
+  box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+}
+.button-grid button.active.button-rare {
+  background: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+}
+.button-grid button.active.button-common {
+  background: var(--neon-green);
+  border-color: var(--neon-green);
+  box-shadow: 0 0 15px rgba(57, 255, 20, 0.4);
+}
+
+/* CSS Grid Cards Showcase Layout */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 30px;
+  justify-content: center;
+}
+
+/* Cyber Card Flipping Setup */
+.cyber-card-wrapper {
+  perspective: 1200px;
+  height: 480px;
+  cursor: pointer;
+}
+
+.cyber-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.cyber-card-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.cyber-card-back, .cyber-card-front {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  border-radius: 14px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* CARD BACK AESTHETICS */
+.cyber-card-back {
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  transition: border-color 0.3s ease;
+}
+
+.circuit-pattern-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.15;
+  background-image: 
+    radial-gradient(rgba(255,255,255,0.15) 1px, transparent 0),
+    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 0),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 0);
+  background-size: 20px 20px, 40px 40px, 40px 40px;
+}
+
+.card-back-core {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  background: var(--bg-darker);
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.neon-circle {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px dashed var(--glow-color);
+  animation: rotateCircle 12s linear infinite;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.05);
+}
+
+.cyber-chip {
+  width: 32px;
+  height: 32px;
+  background: #1b1b36;
+  border: 2.5px solid var(--glow-color);
+  border-radius: 6px;
+  box-shadow: 0 0 20px var(--glow-color);
+}
+
+.node-num {
+  position: absolute;
+  bottom: -28px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--cyber-gray);
+  letter-spacing: 1px;
+}
+
+.status-panel {
+  position: absolute;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0,0,0,0.3);
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--neon-green);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--neon-green);
+  animation: pulseDot 1.5s infinite alternate;
+}
+
+.firmware-tag {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--cyber-gray);
+}
+
+/* CARD FRONT AESTHETICS */
+.cyber-card-front {
+  background: var(--bg-card);
+  border: 2px solid var(--glow-color);
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(0,0,0,0.6);
+  padding: 16px;
+  transform: rotateY(180deg);
+  justify-content: space-between;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+}
+
+.node-id {
+  font-size: 0.75rem;
+  color: var(--cyber-gray);
+}
+
+.rarity-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1.5px solid transparent;
+}
+
+.rarity-pill.common { border-color: var(--neon-green); color: var(--neon-green); }
+.rarity-pill.rare { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.rarity-pill.epic { border-color: var(--neon-magenta); color: var(--neon-magenta); }
+.rarity-pill.legend { border-color: var(--neon-gold); color: var(--neon-gold); }
+
+/* SVG Circuitry Art Styling */
+.card-circuit-art {
+  height: 160px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.03);
+  margin: 12px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.animated-circuit {
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+  animation: drawCircuit 4s ease-out forwards;
+}
+
+.cyber-card-wrapper:hover .animated-circuit {
+  animation: drawCircuitPulse 2s ease-in-out infinite;
+}
+
+.glowing-node {
+  animation: glowNode 2s infinite alternate;
+}
+
+/* Rarity Bound Color Systems & Glows */
+.rarity-common {
+  --glow-color: var(--neon-green);
+}
+.rarity-rare {
+  --glow-color: var(--neon-cyan);
+}
+.rarity-epic {
+  --glow-color: var(--neon-magenta);
+}
+.rarity-legend {
+  --glow-color: var(--neon-gold);
+}
+
+/* Neon Glow Shadow States */
+.cyber-card-wrapper.rarity-common:hover .cyber-card-inner {
+  box-shadow: 0 0 30px rgba(57, 255, 20, 0.4);
+}
+.cyber-card-wrapper.rarity-rare:hover .cyber-card-inner {
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.4);
+}
+.cyber-card-wrapper.rarity-epic:hover .cyber-card-inner {
+  box-shadow: 0 0 30px rgba(255, 0, 255, 0.4);
+}
+.cyber-card-wrapper.rarity-legend:hover .cyber-card-inner {
+  box-shadow: 0 0 30px rgba(255, 165, 0, 0.4);
+}
+
+.cyber-card-wrapper:hover .cyber-card-back {
+  border-color: var(--glow-color);
+}
+
+/* Card Body Content */
+.card-body {
+  text-align: left;
+}
+
+.card-name {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 2px 0;
+  color: #fff;
+}
+
+.card-traditional {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--cyber-gray);
+  margin: 0 0 10px 0;
+}
+
+.card-description {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: rgba(255,255,255,0.7);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Footer & Buttons */
+.card-footer {
+  margin-top: 14px;
+}
+
+.inspect-btn {
+  width: 100%;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
+  padding: 8px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.inspect-btn:hover {
+  background: var(--glow-color);
+  color: var(--bg-darker);
+  border-color: var(--glow-color);
+  font-weight: 700;
+  box-shadow: 0 0 15px var(--glow-color);
+}
+
+/* Empty State Message */
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  background: var(--bg-card);
+  border: 1px dashed rgba(255, 51, 83, 0.3);
+  border-radius: 12px;
+}
+
+.reset-search-btn {
+  margin-top: 15px;
+  background: var(--neon-red);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(255, 51, 83, 0.4);
+}
+
+/* Modal Specs & Overlay */
+.inspect-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(5, 5, 12, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.inspect-dialog {
+  background: var(--bg-card);
+  border: 2px solid var(--neon-cyan);
+  box-shadow: 0 0 40px rgba(0, 255, 255, 0.3);
+  border-radius: 16px;
+  width: 650px;
+  max-width: 90%;
+  padding: 24px;
+  animation: scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.dialog-header h2 {
+  font-size: 1.3rem;
+  margin: 0;
+  color: #fff;
+}
+
+.close-dialog {
+  background: none;
+  border: none;
+  color: var(--cyber-gray);
+  font-size: 2rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.close-dialog:hover {
+  color: #fff;
+}
+
+.dialog-body {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 30px;
+}
+
+@media (max-width: 600px) {
+  .dialog-body {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.dialog-card-preview {
+  height: 240px;
+  background: var(--bg-darker);
+  border: 1.5px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.dialog-specs {
+  text-align: left;
+}
+
+.spec-row {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 8px 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.spec-row .label {
+  color: var(--cyber-gray);
+}
+
+.spec-row .val {
+  color: #fff;
+  font-weight: 700;
+}
+
+.spec-row .val.text-glowing {
+  color: var(--glow-color);
+  text-shadow: 0 0 5px var(--glow-color);
+}
+
+.spec-desc {
+  margin-top: 15px;
+}
+
+.spec-desc h3 {
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+  color: var(--neon-magenta);
+  margin: 0 0 6px 0;
+}
+
+.spec-desc p {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.8);
+  margin: 0;
+}
+
+.firmware-flash {
+  margin-top: 24px;
+}
+
+.flash-ready {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--neon-green);
+  text-shadow: 0 0 4px var(--neon-green);
+  margin-bottom: 8px;
+}
+
+.flash-btn {
+  width: 100%;
+  background: var(--neon-cyan);
+  border: none;
+  color: var(--bg-darker);
+  padding: 12px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.flash-btn:hover {
+  box-shadow: 0 0 25px var(--neon-cyan);
+  transform: translateY(-2px);
+}
+
+/* KEYFRAMES & KEY ANIMATIONS */
+@keyframes rotateCircle {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulseDot {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+@keyframes drawCircuit {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes drawCircuitPulse {
+  0% { stroke-dashoffset: 0; opacity: 1; }
+  50% { stroke-dashoffset: 100; opacity: 0.7; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes glowNode {
+  from { opacity: 0.6; r: 5; }
+  to { opacity: 1; r: 8; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.neon-text-magenta {
+  color: var(--neon-magenta);
+  text-shadow: 0 0 15px rgba(255, 0, 255, 0.6);
+}
+.neon-text-red {
+  color: var(--neon-red);
+  text-shadow: 0 0 15px rgba(255, 51, 83, 0.6);
+}

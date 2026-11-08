@@ -1,0 +1,12 @@
+*.apk
+*.zip
+.env
+.gradle/
+build/
+app/build/
+.kotlin/
+.build-outputs/
+app/src/main/assets/CyberTarot.apk
+*-debug.log
+firebase-debug.log
+firestore-debug.log

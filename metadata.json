@@ -1,0 +1,8 @@
+{
+  "name": "WEED GURU",
+  "description": "A futuristic Rider-Waite Tarot deck with digital circuitry aesthetics, interactive readings, rare NFT card minting, and a dynamic exchange market.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
