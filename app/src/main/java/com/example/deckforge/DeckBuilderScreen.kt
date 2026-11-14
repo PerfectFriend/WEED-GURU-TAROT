@@ -34,6 +34,9 @@ import com.example.data.CyberTarotDeck
 import com.example.data.SavedDeck
 import com.example.duel.BattleCardFactory
 import com.example.duel.ElementAffinity
+import com.example.ui.components.FramedTarotArtworkWindow
+import com.example.ui.components.WeedGuruCardInspectorDialog
+import com.example.ui.components.getArcanaRomanNumeral
 import com.example.viewmodel.TarotViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -307,7 +310,7 @@ fun DeckBuilderScreen(
 
         // Deck Slots / Working Cards Scroll
         Text(
-            text = if (lang == "ru") "СОСТАВ КОЛОДЫ (НАЖМИТЕ ДЛЯ УДАЛЕНИЯ):" else "DECK ROSTER (TAP TO REMOVE):",
+            text = if (lang == "ru") "СОСТАВ КОЛОДЫ (ТАП — ПОЛНЫЙ ЭКРАН, ✕ — УБРАТЬ):" else "DECK ROSTER (TAP: FULLSCREEN, ✕: REMOVE):",
             color = Color.LightGray,
             fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
@@ -317,7 +320,7 @@ fun DeckBuilderScreen(
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(90.dp)
+                .height(94.dp)
                 .background(Color(0xFF080C18), RoundedCornerShape(8.dp))
                 .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(8.dp))
                 .padding(4.dp),
@@ -338,61 +341,90 @@ fun DeckBuilderScreen(
                     color = Color(0xFF101626),
                     border = BorderStroke(1.dp, element.color.copy(alpha = 0.8f)),
                     modifier = Modifier
-                        .width(62.dp)
+                        .width(68.dp)
                         .fillMaxHeight()
                         .clickable {
-                            CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
-                            val mutable = workingCards.toMutableList()
-                            mutable.removeAt(listIdx)
-                            workingCards = mutable
+                            if (card != null) {
+                                CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CARD_DRAW)
+                                showInspectCard = card
+                            }
                         }
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(4.dp),
-                        verticalArrangement = Arrangement.SpaceBetween,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(4.dp),
+                            verticalArrangement = Arrangement.SpaceBetween,
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${((card?.defaultRarity?.let {
+                                        when (it) {
+                                            "Genesis", "Legend" -> 5
+                                            "Epic" -> 4
+                                            "Rare" -> 3
+                                            else -> 1 + (cardIdx % 3)
+                                        }
+                                    } ?: 2) - (up?.energyDiscount ?: 0)).coerceAtLeast(1)}⚡",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFFB800)
+                                )
+                                Text(
+                                    text = element.symbol,
+                                    fontSize = 9.sp,
+                                    modifier = Modifier.padding(end = 14.dp)
+                                )
+                            }
+
                             Text(
-                                text = "${((card?.defaultRarity?.let {
-                                    when (it) {
-                                        "Genesis", "Legend" -> 5
-                                        "Epic" -> 4
-                                        "Rare" -> 3
-                                        else -> 1 + (cardIdx % 3)
-                                    }
-                                } ?: 2) - (up?.energyDiscount ?: 0)).coerceAtLeast(1)}⚡",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFFFB800)
+                                text = card?.name ?: "#$cardIdx",
+                                fontSize = 8.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                                color = Color.White,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
                             )
-                            Text(text = element.symbol, fontSize = 9.sp)
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                val basePwr = 2 + (cardIdx % 4) + (up?.bonusPower ?: 0)
+                                val baseDef = 2 + ((cardIdx + 1) % 4) + (up?.bonusDefense ?: 0)
+                                Text(text = "⚔$basePwr", fontSize = 8.sp, color = Color(0xFFFF5252))
+                                Text(text = "🛡$baseDef", fontSize = 8.sp, color = Color(0xFF00FF66))
+                            }
                         }
 
-                        Text(
-                            text = card?.name ?: "#$cardIdx",
-                            fontSize = 8.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                            color = Color.White,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(18.dp)
+                                .clip(RoundedCornerShape(bottomStart = 6.dp))
+                                .background(Color.Black.copy(alpha = 0.78f))
+                                .clickable {
+                                    CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
+                                    val mutable = workingCards.toMutableList()
+                                    mutable.removeAt(listIdx)
+                                    workingCards = mutable
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                            val basePwr = 2 + (cardIdx % 4) + (up?.bonusPower ?: 0)
-                            val baseDef = 2 + ((cardIdx + 1) % 4) + (up?.bonusDefense ?: 0)
-                            Text(text = "⚔$basePwr", fontSize = 8.sp, color = Color(0xFFFF5252))
-                            Text(text = "🛡$baseDef", fontSize = 8.sp, color = Color(0xFF00FF66))
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = if (lang == "ru") "Убрать из колоды" else "Remove from deck",
+                                tint = Color(0xFFFF5252),
+                                modifier = Modifier.size(11.dp)
+                            )
                         }
                     }
                 }
@@ -493,18 +525,24 @@ fun DeckBuilderScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CARD_DRAW)
+                                    showInspectCard = card
+                                }
                         ) {
-                            Box(
+                            FramedTarotArtworkWindow(
+                                card = card,
+                                isUpright = true,
+                                compactWatermark = true,
+                                showDiagonalWatermark = false,
+                                rarityBorderColor = elem.color.copy(alpha = 0.7f),
+                                cornerRadius = 6,
                                 modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(elem.color.copy(alpha = 0.15f))
-                                    .border(1.dp, elem.color.copy(alpha = 0.5f), RoundedCornerShape(6.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(text = elem.symbol, fontSize = 16.sp)
-                            }
+                                    .width(34.dp)
+                                    .height(50.dp)
+                            )
 
                             Column {
                                 Row(
@@ -528,7 +566,7 @@ fun DeckBuilderScreen(
                                     }
                                 }
                                 Text(
-                                    text = "${card.traditionalName} • ${card.defaultRarity}",
+                                    text = "${getArcanaRomanNumeral(card.index)} • ${card.traditionalName} • ${card.defaultRarity}",
                                     color = Color.Gray,
                                     fontSize = 10.sp
                                 )
@@ -612,6 +650,15 @@ fun DeckBuilderScreen(
                     Text(if (lang == "ru") "Отмена" else "Cancel")
                 }
             }
+        )
+    }
+
+    showInspectCard?.let { cardToInspect ->
+        WeedGuruCardInspectorDialog(
+            card = cardToInspect,
+            isUpright = true,
+            systemLanguage = lang,
+            onDismiss = { showInspectCard = null }
         )
     }
 }

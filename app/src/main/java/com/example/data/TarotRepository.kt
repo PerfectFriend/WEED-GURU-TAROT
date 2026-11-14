@@ -6,6 +6,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
+import com.example.data.crypto.CryptoHelper
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
@@ -1215,7 +1217,17 @@ class TarotRepository private constructor(context: Context) {
     }
 
     // Secure user profile with BIP39 seed phrase and 8-digit PIN
-    suspend fun saveSecuredProfile(dob: String, first: String, last: String, seed: String, pin: String, pinSafe: String = "11111111", pinPanic: String = "22222222", aliasVal: String = "", avatarIdx: Int = 0) = withContext(Dispatchers.IO) {
+    suspend fun saveSecuredProfile(
+        dob: String,
+        first: String,
+        last: String,
+        seed: String,
+        pin: String,
+        pinSafe: String? = null,
+        pinPanic: String? = null,
+        aliasVal: String = "",
+        avatarIdx: Int = 0
+    ) = withContext(Dispatchers.IO) {
         val profile = dao.getUserProfileSync() ?: UserProfile()
         val updated = profile.copy(
             isSecured = true,
@@ -1239,6 +1251,19 @@ class TarotRepository private constructor(context: Context) {
                 price = 0,
                 type = "SECURE_CREDENTIALS",
                 targetParty = "BIP39 Entropy Core",
+                timestamp = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun logFailedSecurityAttempt(pinLength: Int) = withContext(Dispatchers.IO) {
+        dao.insertTransactionLog(
+            TransactionLog(
+                cardIndex = -4,
+                rarity = "ALERT",
+                price = 0,
+                type = "SECURITY_FAILED_PIN_ATTEMPT",
+                targetParty = "Failed auth attempt (len=$pinLength)",
                 timestamp = System.currentTimeMillis()
             )
         )
@@ -1424,79 +1449,111 @@ class TarotRepository private constructor(context: Context) {
         }
     }
 
-    fun getEncryptedMessages(contactId: Int): Flow<List<EncryptedMessage>> {
-        return dao.getEncryptedMessagesForContact(contactId)
+    suspend fun getChannelSecretKey(contactId: Int): SecretKeySpec = withContext(Dispatchers.IO) {
+        val profile = dao.getUserProfileSync()
+        val contact = dao.getPeerContactById(contactId)
+        val masterSeed = profile?.seedPhrase.orEmpty()
+        val contactPubKey = contact?.publicKey ?: "0x00"
+        CryptoHelper.deriveChannelKey(masterSeed, contactId, contactPubKey)
     }
 
-    suspend fun sendEncryptedMessage(contactId: Int, senderName: String, plaintext: String, aesKey: String) = withContext(Dispatchers.IO) {
-        val cipherText = encryptAES(plaintext, aesKey)
+    fun getEncryptedMessages(contactId: Int): Flow<List<EncryptedMessage>> {
+        return dao.getEncryptedMessagesForContact(contactId).map { messages ->
+            val profile = dao.getUserProfileSync()
+            val contact = dao.getPeerContactById(contactId)
+            val masterSeed = profile?.seedPhrase.orEmpty()
+            val contactPubKey = contact?.publicKey ?: "0x00"
+            val secretKey = CryptoHelper.deriveChannelKey(masterSeed, contactId, contactPubKey)
+
+            messages.map { msg ->
+                val decryptedResult = CryptoHelper.decryptAesGcm(msg.ciphertext, msg.iv, secretKey)
+                val decryptedText = decryptedResult.getOrElse {
+                    "[INTEGRITY ERROR: AUTHENTICATION TAG MISMATCH]"
+                }
+                msg.copy(plaintext = decryptedText)
+            }
+        }
+    }
+
+    suspend fun sendEncryptedMessage(contactId: Int, senderName: String, plaintext: String, aesKey: String? = null) = withContext(Dispatchers.IO) {
+        val profile = dao.getUserProfileSync()
+        val contact = dao.getPeerContactById(contactId)
+        val masterSeed = profile?.seedPhrase.orEmpty()
+        val contactPubKey = contact?.publicKey ?: "0x00"
+        val secretKey = if (!aesKey.isNullOrBlank() && !aesKey.startsWith("SECURE_KEY_CH_")) {
+            val md = MessageDigest.getInstance("SHA-256")
+            val keyBytes = md.digest(aesKey.toByteArray(Charsets.UTF_8))
+            SecretKeySpec(keyBytes, "AES")
+        } else {
+            CryptoHelper.deriveChannelKey(masterSeed, contactId, contactPubKey)
+        }
+
+        val encrypted = CryptoHelper.encryptAesGcm(plaintext, secretKey)
         dao.insertEncryptedMessage(
             EncryptedMessage(
                 contactId = contactId,
                 senderName = senderName,
-                plaintext = plaintext,
-                ciphertext = cipherText,
-                cryptographicKey = aesKey,
-                isIncoming = false
+                ciphertext = encrypted.ciphertextBase64,
+                iv = encrypted.ivBase64,
+                isIncoming = false,
+                plaintext = plaintext
             )
         )
-        
-        // Trigger realistic automated peer response after a brief network processing delay
-        val contact = dao.getPeerContactById(contactId)
+
+        // Trigger realistic automated peer response after network processing delay
         val responderName = contact?.name ?: "Remote Peer"
         val onionAddr = contact?.onionAddress ?: "unknown.onion"
-        
-        // Fetch recent chat history to maintain realistic context
+
+        // Decrypt recent messages from storage to maintain authentic context
         val messagesList = dao.getEncryptedMessagesForContact(contactId).firstOrNull() ?: emptyList()
-        val recentHistory = messagesList.takeLast(10).map {
-            Pair(it.senderName, it.plaintext)
+        val recentHistory = messagesList.takeLast(10).map { msg ->
+            val dec = CryptoHelper.decryptAesGcm(msg.ciphertext, msg.iv, secretKey).getOrElse { "[SECURE]" }
+            Pair(msg.senderName, dec)
         }
-        
+
         val responsePlaintext = GeminiService.generatePeerResponse(
             peerName = responderName,
             peerOnion = onionAddr,
             userMessage = plaintext,
             chatHistory = recentHistory
         )
-        
-        val responseCiphertext = encryptAES(responsePlaintext, aesKey)
+
+        val responseEncrypted = CryptoHelper.encryptAesGcm(responsePlaintext, secretKey)
         kotlinx.coroutines.delay(1200)
         dao.insertEncryptedMessage(
             EncryptedMessage(
                 contactId = contactId,
                 senderName = responderName,
-                plaintext = responsePlaintext,
-                ciphertext = responseCiphertext,
-                cryptographicKey = aesKey,
-                isIncoming = true
+                ciphertext = responseEncrypted.ciphertextBase64,
+                iv = responseEncrypted.ivBase64,
+                isIncoming = true,
+                plaintext = responsePlaintext
             )
         )
     }
 
     fun encryptAES(message: String, key: String): String {
         return try {
-            val keyBytes = key.padEnd(16, '0').substring(0, 16).toByteArray(Charsets.UTF_8)
+            val md = MessageDigest.getInstance("SHA-256")
+            val keyBytes = md.digest(key.toByteArray(Charsets.UTF_8))
             val secretKey = SecretKeySpec(keyBytes, "AES")
-            val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
-            val encryptedBytes = cipher.doFinal(message.toByteArray(Charsets.UTF_8))
-            Base64.encodeToString(encryptedBytes, Base64.NO_WRAP)
+            val res = CryptoHelper.encryptAesGcm(message, secretKey)
+            "${res.ivBase64}:${res.ciphertextBase64}"
         } catch (e: Exception) {
-            "ERROR_ENCRYPT_FAIL"
+            "ERROR_ENCRYPT_FAIL: ${e.message}"
         }
     }
 
     fun decryptAES(encrypted: String, key: String): String {
         return try {
-            val keyBytes = key.padEnd(16, '0').substring(0, 16).toByteArray(Charsets.UTF_8)
+            val parts = encrypted.split(":", limit = 2)
+            if (parts.size != 2) return "[INVALID CIPHERTEXT FORMAT]"
+            val md = MessageDigest.getInstance("SHA-256")
+            val keyBytes = md.digest(key.toByteArray(Charsets.UTF_8))
             val secretKey = SecretKeySpec(keyBytes, "AES")
-            val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
-            cipher.init(Cipher.DECRYPT_MODE, secretKey)
-            val decodedBytes = Base64.decode(encrypted, Base64.NO_WRAP)
-            val decryptedBytes = cipher.doFinal(decodedBytes)
-            String(decryptedBytes, Charsets.UTF_8)
+            CryptoHelper.decryptAesGcm(parts[1], parts[0], secretKey).getOrElse { "[DECRYPTION FAILED: $it]" }
         } catch (e: Exception) {
-            "DECRYPTION_ERROR: $e"
+            "DECRYPTION_ERROR: ${e.message}"
         }
     }
 

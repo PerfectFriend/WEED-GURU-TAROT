@@ -16,6 +16,7 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import kotlin.random.Random
+import com.example.data.crypto.CryptoHelper
 
 /**
  * Sub-Zero Decentered Swarm Cryptographic Storage Node Core.
@@ -562,11 +563,12 @@ class SwarmStorageManager private constructor(private val context: Context) {
     }
 
     private fun deriveKey(password: String, salt: ByteArray): SecretKeySpec {
-        // High strength derivation: SHA-256 hash of password combined with salt
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-        digest.update(salt)
-        val keyBytes = digest.digest(password.toByteArray(Charsets.UTF_8))
-        return SecretKeySpec(keyBytes, "AES")
+        // OWASP PBKDF2-HMAC-SHA256 derivation with 210,000 iterations
+        return CryptoHelper.deriveKeyPbkdf2(
+            passphrase = password.toCharArray(),
+            salt = salt,
+            iterations = CryptoHelper.PBKDF2_ITERATIONS
+        )
     }
 }
 

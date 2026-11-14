@@ -326,7 +326,8 @@ object CyberTarotDeck {
             cyberMeaning = "The origin of all physical energy in the universe. The foundational electric spark that powers cellular life.",
             uprightAdvice = "Ignite the primary spark. Small subatomic actions lead to cosmic reactions.",
             reversedAdvice = "Ground your electric connections. Prevent static build-up from disrupting your core circuits.",
-            defaultRarity = "Genesis"
+            defaultRarity = "Genesis",
+            series = "Genesis Series"
         ),
         CyberTarotCard(
             index = 23,
@@ -339,7 +340,8 @@ object CyberTarotDeck {
             cyberMeaning = "The dense, unwavering anchor of atomic existence. Unshakable internal core strength.",
             uprightAdvice = "Hold your central position. Let your core gravity pull all necessary resources inward.",
             reversedAdvice = "Stabilize your internal nuclear force before trying to expand outward.",
-            defaultRarity = "Genesis"
+            defaultRarity = "Genesis",
+            series = "Genesis Series"
         ),
         CyberTarotCard(
             index = 24,
@@ -352,7 +354,8 @@ object CyberTarotDeck {
             cyberMeaning = "The simple, perfect synthesis of electron and proton. The raw fuel of every living sun.",
             uprightAdvice = "Combine your elemental energy into living water and light.",
             reversedAdvice = "Handle primal energy with respect. Keep volatile elements under clear pressure control.",
-            defaultRarity = "Genesis"
+            defaultRarity = "Genesis",
+            series = "Genesis Series"
         ),
         CyberTarotCard(
             index = 25,
@@ -365,7 +368,8 @@ object CyberTarotDeck {
             cyberMeaning = "The eternal living code passed down through eons. Pure genetic memory and digital organic alignment.",
             uprightAdvice = "Honor your genetic blueprint. The instructions for perfection are already encoded in your DNA.",
             reversedAdvice = "Protect your pure genetics from environmental corruption or degradation.",
-            defaultRarity = "Genesis"
+            defaultRarity = "Genesis",
+            series = "Genesis Series"
         ),
         CyberTarotCard(
             index = 26,

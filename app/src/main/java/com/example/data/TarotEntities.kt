@@ -20,8 +20,8 @@ data class UserProfile(
     val securedLast: String = "",
     val seedPhrase: String = "",
     val pinCode: String = "", // 8-digit PIN code
-    val pinSafeMode: String = "11111111", // alternative pin 1 (Safe botanical/chat mode)
-    val pinPanicMode: String = "22222222", // alternative pin 2 (Panic reset wipe)
+    val pinSafeMode: String? = null, // optional alternative pin for Safe/Decoy mode
+    val pinPanicMode: String? = null, // Deprecated - retained for entity compatibility, not triggered via unlock
     // Localization
     val systemLanguage: String = "en", // default to English
     // Proxy Configurations (Tor, VPN, V2Ray, etc.)
@@ -111,12 +111,32 @@ data class EncryptedMessage(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val contactId: Int,
     val senderName: String,
-    val plaintext: String,
     val ciphertext: String,
-    val cryptographicKey: String,
+    val iv: String = "",
     val timestamp: Long = System.currentTimeMillis(),
-    val isIncoming: Boolean = false
-)
+    val isIncoming: Boolean = false,
+    @androidx.room.Ignore
+    val plaintext: String = ""
+) {
+    constructor(
+        id: Int,
+        contactId: Int,
+        senderName: String,
+        ciphertext: String,
+        iv: String,
+        timestamp: Long,
+        isIncoming: Boolean
+    ) : this(
+        id = id,
+        contactId = contactId,
+        senderName = senderName,
+        ciphertext = ciphertext,
+        iv = iv,
+        timestamp = timestamp,
+        isIncoming = isIncoming,
+        plaintext = ""
+    )
+}
 
 @Immutable
 @Entity(tableName = "p2p_transactions")

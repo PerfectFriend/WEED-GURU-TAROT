@@ -156,7 +156,11 @@ object CardLocalizationHelper {
         23 to mapOf("en" to "Nuclear Anchor", "ru" to "Ядерный Якорь", "es" to "Ancla Nuclear", "zh" to "核锚点", "fr" to "Ancre Nucléaire", "de" to "Kernanker", "pt" to "Âncora Nuclear", "hi" to "परमाणु लंगर"),
         24 to mapOf("en" to "First Element", "ru" to "Первый Элемент", "es" to "Primer Elemento", "zh" to "第一元素", "fr" to "Premier Élément", "de" to "Erstes Element", "pt" to "Primeiro Elemento", "hi" to "पहला तत्व"),
         25 to mapOf("en" to "Biological Code", "ru" to "Первичный ДНК-Код", "es" to "Código Biológico", "zh" to "生命代码", "fr" to "Code Biologique", "de" to "Biologischer Code", "pt" to "Código Biológico", "hi" to "जैविक कोड"),
-        26 to mapOf("en" to "Genesis - Origin of All", "ru" to "Genesis - Начало Начал", "es" to "Génesis - Origen de Todo", "zh" to "创世纪 - 万物之源", "fr" to "Genèse - Origine de Tout", "de" to "Genesis - Ursprung von Allem", "pt" to "Gênesis - Origem de Tudo", "hi" to "जेनेसिस - सबका मूल")
+        26 to mapOf("en" to "Genesis - Origin of All", "ru" to "Genesis - Начало Начал", "es" to "Génesis - Origen de Todo", "zh" to "创世纪 - 万物之源", "fr" to "Genèse - Origine de Tout", "de" to "Genesis - Ursprung von Allem", "pt" to "Gênesis - Origem de Tudo", "hi" to "जेनेसिस - सबका मूल"),
+        27 to mapOf("en" to "Petrified Light", "ru" to "Окаменевший Свет", "es" to "Luz Petrificada", "zh" to "石化之光", "fr" to "Lumière Pétrifiée", "de" to "Versteinertes Licht", "pt" to "Luz Petrificada", "hi" to "पत्थर बना प्रकाश"),
+        28 to mapOf("en" to "Golden Nectar", "ru" to "Золотой Нектар", "es" to "Néctar Dorado", "zh" to "黄金花蜜", "fr" to "Nectar Doré", "de" to "Goldener Nektar", "pt" to "Néctar Dourado", "hi" to "सुनहरा अमृत"),
+        29 to mapOf("en" to "Bioluminescent Sanctuary", "ru" to "Биолюминесцентный Оазис", "es" to "Santuario Bioluminiscente", "zh" to "生物发光圣地", "fr" to "Sanctuaire Bioluminescent", "de" to "Biolumineszentes Heiligtum", "pt" to "Santuário Bioluminescente", "hi" to "बायोल्यूमिनसेंट अभयारण्य"),
+        30 to mapOf("en" to "Sovereign of the Deep", "ru" to "Владыка Глубин", "es" to "Soberano de las Profundidades", "zh" to "深渊主宰", "fr" to "Souverain des Profondeurs", "de" to "Herrscher der Tiefe", "pt" to "Soberano das Profundezas", "hi" to "गहराइयों का सम्राट")
     )
 
     private val dbCardTranslations = java.util.concurrent.ConcurrentHashMap<Int, CardLocalizationItem>()
@@ -185,7 +189,10 @@ object CardLocalizationHelper {
                 else -> item.nameEn
             }
         }
-        return cardNames[index]?.get(lang) ?: cardNames[index]?.get("en") ?: ""
+        return cardNames[index]?.get(lang)
+            ?: cardNames[index]?.get("en")
+            ?: CyberTarotDeck.cards.getOrNull(index)?.name
+            ?: ""
     }
 
     fun getLocalizedTraditionalName(index: Int, lang: String): String {
@@ -205,7 +212,10 @@ object CardLocalizationHelper {
                 else -> item.traditionalNameEn
             }
         }
-        return traditionalNames[index]?.get(lang) ?: traditionalNames[index]?.get("en") ?: ""
+        return traditionalNames[index]?.get(lang)
+            ?: traditionalNames[index]?.get("en")
+            ?: CyberTarotDeck.cards.getOrNull(index)?.traditionalName
+            ?: ""
     }
 
     fun getLocalizedDescription(index: Int, lang: String): String {
@@ -252,6 +262,15 @@ object CardLocalizationHelper {
                 19 -> "Ослепительная двухконтактная ДНаТ-лампа мощностью 1000 Ватт излучает мощный золотой спектр, стимулируя взрывное цветение."
                 20 -> "Сверкающая банка идеально пролеченных шишек получает золотую ленту победителя на престижном кубке Cannabis Cup."
                 21 -> "Захватывающий панорамный вид на залитую солнцем долину, полную легальных зеленых полей медицинского каннабиса."
+                22 -> "Фундаментальный субатомный носитель электрического заряда — катализатор клеточной энергии, фотосинтеза и живого света."
+                23 -> "Тяжелое положительное атомное ядро, удерживающее материю вместе силой первичного ядерного притяжения."
+                24 -> "Первородный элемент космоса, питающий звезды, чистую воду и всю органическую химию вселенной."
+                25 -> "Золотая двойная спираль, кодирующая древние терпеновые профили, память поколений и ботанический интеллект."
+                26 -> "Бесконечная золотая точка творения — Начало Начал, из которой рождаются свет, материя и осознанность."
+                27 -> "Древняя окаменевшая золотая смола балтийского янтаря, сохранившая доисторическую флору в кристальной чистоте."
+                28 -> "Концентрированные золотые капли чистой терпеновой смолы и живых трихом, сияющие под янтарным светом."
+                29 -> "Цветущий подводный коралловый риф, пульсирующий голубым биолюминесцентным светом и симбиозом водной экосистемы."
+                30 -> "Величественный глубоководный левиафан, спокойно и неудержимо скользящий по бездонным океаническим желобам."
                 else -> enDesc
             }
             "es" -> "Nodo de cultivo de Ganja #${index}. Representa el misterio de la genética orgánica y los flujos de terpenos."
@@ -423,6 +442,15 @@ object CardLocalizationHelper {
                 19 -> "Собирайте плоды своих трудов! Разделите этот прекрасный урожай со своими близкими."
                 20 -> "Ваш процесс пролечки безупречен. Гордитесь своими результатами, вы настоящий мастер."
                 21 -> "Ваш урожай собран и пролечен. Сделайте глубокий вдох чистого воздуха и наслаждайтесь."
+                22 -> "Зажгите первую искру. Малые квантовые шаги запускают великие процессы роста."
+                23 -> "Удерживайте центральную позицию. Пусть ваша внутренняя гравитация притягивает нужные ресурсы."
+                24 -> "Соедините стихийную энергию в живую воду и чистый свет фотосинтеза."
+                25 -> "Чтите генетический код: формула идеального фенотипа уже записана в вашей ДНК."
+                26 -> "Вы достигли точки истока Начала Начал. Направляйте бесконечную энергию осознанно."
+                27 -> "Кристальная ясность хранит плоды вашего труда. Позвольте времени выдержать ценность."
+                28 -> "Сфокусируйтесь на чистой эссенции вместо объема — качество превращается в жидкое золото."
+                29 -> "Создавайте симбиоз и поддерживающее окружение: разнообразие усиливает всю систему."
+                30 -> "Уверенно идите через глубокие воды. Вы сами управляете силой своих глубин."
                 else -> enVal
             }
             "es" -> "Monitoree la humedad y el pH del suelo para garantizar una absorción de nutrientes óptima."
@@ -480,6 +508,15 @@ object CardLocalizationHelper {
                 19 -> "Листья бледнеют из-за светового ожога. Поднимите лампу выше или уменьшите мощность балласта."
                 20 -> "Ваши шишки пахнут сеном, так как были закрыты слишком рано. Открывайте банки для проветривания."
                 21 -> "Ранние заморозки угрожают вашим кустам в открытом грунте. Укройте кусты сегодня ночью."
+                22 -> "Заземлите свои контуры и предотвратите статический шум в системе."
+                23 -> "Стабилизируйте внутреннее ядерное равновесие перед тем, как расширяться наружу."
+                24 -> "Обращайтесь с первичной энергией бережно, контролируя давление среды."
+                25 -> "Защитите чистоту своей линии генетики от деградации и внешнего стресса."
+                26 -> "Сохраняйте баланс в присутствии огромной силы; не давайте хаосу подавить фокус."
+                27 -> "Не застывайте в старых привычках, словно насекомое в янтаре."
+                28 -> "Не увязните в чрезмерно густых и сложных деталях — упростите процесс."
+                29 -> "Очистите свою водную среду от токсичных влияний и застоя."
+                30 -> "Не бойтесь давления глубин — укрепите внутренний каркас стойкости."
                 else -> enVal
             }
             "es" -> "Riesgo de moho por alta humedad. Aumente la ventilación de inmediato."

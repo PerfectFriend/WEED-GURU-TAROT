@@ -35,6 +35,9 @@ import com.example.data.CyberTarotDeck
 import com.example.duel.BattleCardFactory
 import com.example.duel.CardSpecialEffect
 import com.example.duel.ElementAffinity
+import com.example.ui.components.FramedTarotArtworkWindow
+import com.example.ui.components.WeedGuruCardInspectorDialog
+import com.example.ui.components.getArcanaRomanNumeral
 import com.example.viewmodel.TarotViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,6 +61,7 @@ fun CardForgeScreen(
     var selectedElementFilter by remember { mutableStateOf<ElementAffinity?>(null) }
     var upgradeFeedbackMessage by remember { mutableStateOf<String?>(null) }
     var isAiForgeOpen by remember { mutableStateOf(false) }
+    var showForgeInspectDialog by remember { mutableStateOf(false) }
 
     if (isAiForgeOpen) {
         com.example.forge.AiArcanaForgeScreen(
@@ -201,19 +205,20 @@ fun CardForgeScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Cyber Card Preview Frame
+                // Unified Collector 420 Tarot Card Preview Frame (with WEED GURU PROPERTY watermark)
                 Box(
                     modifier = Modifier
-                        .width(105.dp)
-                        .height(150.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .width(126.dp)
+                        .height(198.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color(0xFF131A2E), Color(0xFF090C16))
+                                listOf(Color(0xFF131A2E), Color(0xFF070A12))
                             )
                         )
-                        .border(1.5.dp, skinColor, RoundedCornerShape(8.dp))
-                        .padding(6.dp)
+                        .border(1.8.dp, skinColor, RoundedCornerShape(10.dp))
+                        .clickable { showForgeInspectDialog = true }
+                        .padding(5.dp)
                 ) {
                     Column(
                         modifier = Modifier.fillMaxSize(),
@@ -226,44 +231,54 @@ fun CardForgeScreen(
                         ) {
                             val effRam = (baseBattleCard.energyCost - currentUpgrade.energyDiscount).coerceAtLeast(1)
                             Text(
-                                text = "$effRam⚡",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFFFFB800)
-                            )
-                            Text(text = element.symbol, fontSize = 12.sp)
-                        }
-
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = selectedCard.name,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                textAlign = TextAlign.Center,
-                                fontFamily = FontFamily.Monospace,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "LVL ${currentUpgrade.upgradeLevel}/5",
+                                text = "${getArcanaRomanNumeral(selectedCard.index)} · $effRam⚡",
                                 fontSize = 9.sp,
-                                color = skinColor,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFFFFB800),
+                                maxLines = 1
                             )
+                            Text(text = element.symbol, fontSize = 11.sp)
                         }
 
-                        // Combat Stats
+                        Spacer(modifier = Modifier.height(3.dp))
+
+                        FramedTarotArtworkWindow(
+                            card = selectedCard,
+                            isUpright = true,
+                            compactWatermark = true,
+                            showDiagonalWatermark = true,
+                            rarityBorderColor = skinColor.copy(alpha = 0.85f),
+                            cornerRadius = 6,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        )
+
+                        Spacer(modifier = Modifier.height(3.dp))
+
+                        Text(
+                            text = selectedCard.name,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            textAlign = TextAlign.Center,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        // Combat Stats & Level
                         val effPwr = baseBattleCard.basePower + currentUpgrade.bonusPower
                         val effDef = baseBattleCard.baseDefense + currentUpgrade.bonusDefense
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "⚔$effPwr", fontSize = 11.sp, color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
-                            Text(text = "🛡$effDef", fontSize = 11.sp, color = Color(0xFF00FF66), fontWeight = FontWeight.Bold)
+                            Text(text = "⚔$effPwr", fontSize = 10.sp, color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
+                            Text(text = "L${currentUpgrade.upgradeLevel}", fontSize = 9.sp, color = skinColor, fontWeight = FontWeight.Bold)
+                            Text(text = "🛡$effDef", fontSize = 10.sp, color = Color(0xFF00FF66), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -646,5 +661,14 @@ fun CardForgeScreen(
                 }
             }
         }
+    }
+
+    if (showForgeInspectDialog) {
+        WeedGuruCardInspectorDialog(
+            card = selectedCard,
+            isUpright = true,
+            systemLanguage = lang,
+            onDismiss = { showForgeInspectDialog = false }
+        )
     }
 }

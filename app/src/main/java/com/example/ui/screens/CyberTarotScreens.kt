@@ -2800,266 +2800,34 @@ fun InteractiveCyberCard(
     }
 
     val localizedName = CardLocalizationHelper.getLocalizedName(card.index, lang)
-    val localizedTraditional = CardLocalizationHelper.getLocalizedTraditionalName(card.index, lang)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(170.dp)
+        modifier = Modifier.width(184.dp)
     ) {
-        val cardBgBrush = if (isRevealed) {
-            Brush.verticalGradient(
-                colors = listOf(
-                    rarityColor.copy(alpha = 0.28f),
-                    Color(0xFF0C091F).copy(alpha = 0.95f)
-                )
-            )
-        } else {
-            Brush.verticalGradient(
-                colors = listOf(
-                    currentSkin.primaryColor.copy(alpha = 0.20f),
-                    Color(0xFF06060E).copy(alpha = 0.95f)
-                )
-            )
-        }
-
-        Box(
+        WeedGuruTarotCard(
+            card = card,
+            isUpright = isUpright,
+            isFlipped = !isRevealed,
+            compact = false,
+            systemLanguage = lang,
+            showOrientationBadge = true,
+            showRarityShader = true,
+            backPromptLabel = if (lang == "ru") "[НАЖМИТЕ ДЛЯ ОТКРЫТИЯ]" else "[TAP TO REVEAL]",
+            onCardClick = {
+                if (!isRevealed) {
+                    isRevealed = true
+                    com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CARD_DRAW)
+                } else {
+                    showFullScreenReview = true
+                }
+            },
             modifier = Modifier
-                .width(170.dp)
-                .height(250.dp)
-                .shadow(
-                    elevation = if (isRevealed) 16.dp else 6.dp,
-                    ambientColor = if (isRevealed) rarityColor else currentSkin.primaryColor,
-                    spotColor = if (isRevealed) rarityColor else currentSkin.primaryColor
-                )
-                .clip(RoundedCornerShape(12.dp))
-                .background(cardBgBrush)
-                .border(
-                    width = 2.5.dp,
-                    color = if (isRevealed) rarityColor else currentSkin.primaryColor.copy(alpha = 0.8f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                .clickable {
-                    if (!isRevealed) {
-                        isRevealed = true
-                        com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CARD_DRAW)
-                    } else {
-                        showFullScreenReview = true
-                    }
-                }
-                .graphicsLayer {
-                    rotationY = rotation
-                    cameraDistance = 12 * density
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            if (rotation <= 90f) {
-                // Card Back with Series Artwork
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(12.dp))
-                ) {
-                    val backImgRes = getCardBackImage(card.series)
-                    Image(
-                        painter = painterResource(id = backImgRes),
-                        contentDescription = "${card.series} Card Back",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color.Transparent, Color(0xDD0A0918))
-                                )
-                            )
-                            .padding(bottom = 8.dp, top = 20.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = card.series.uppercase(),
-                                fontSize = 14.sp,
-                                fontFamily = RajdhaniFontFamily,
-                                color = NeonCyan,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            ContrastText(
-                                text = "[TAP TO REVEAL]",
-                                fontFamily = RajdhaniFontFamily,
-                                fontSize = 16.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            } else {
-                // Card Front (Decrypted Node)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            rotationY = 180f
-                        }
-                ) {
-                    CyberRarityShaderOverlay(
-                        rarity = card.defaultRarity,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(12.dp))
-                    )
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        // Header (Rarity Badge & Index)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            ContrastText(
-                                text = "NODE #${String.format("%02d", card.index)}",
-                                fontSize = 16.sp,
-                                fontFamily = RajdhaniFontFamily,
-                                color = Color.White
-                            )
-                            CyberRarityGlowBadge(
-                                rarity = card.defaultRarity
-                            )
-                        }
+                .fillMaxWidth()
+                .testTag("reading_tarot_card_${card.index}")
+        )
 
-                    val imageResId = getCardImage(card.index)
-                    if (imageResId != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(96.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.5.dp, rarityColor, RoundedCornerShape(8.dp))
-                                .background(CyberCharcoal),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = imageResId),
-                                contentDescription = "${card.name} - Van Gogh styled",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .rotate(if (isUpright) 0f else 180f),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                    } else {
-                        // Card Art / Symbolic Botanical Sprout & Glowing Resin Aura
-                        Box(
-                            modifier = Modifier
-                                .size(96.dp)
-                                .drawBehind {
-                                    val center = Offset(size.width / 2, size.height / 2)
-                                    // Background organic aura
-                                    drawCircle(
-                                        color = rarityColor.copy(alpha = 0.15f),
-                                        radius = size.width / 2
-                                    )
-                                    // Concentric organic glow rings
-                                    drawCircle(
-                                        color = rarityColor.copy(alpha = 0.35f),
-                                        radius = 24.dp.toPx(),
-                                        style = Stroke(width = 1.5.dp.toPx())
-                                    )
-                                    drawCircle(
-                                        color = rarityColor,
-                                        radius = 12.dp.toPx(),
-                                        style = Stroke(width = 2.5.dp.toPx())
-                                    )
-                                    // Dynamic grower root veins / branch stems
-                                    drawLine(
-                                        color = rarityColor.copy(alpha = 0.8f),
-                                        start = Offset(center.x, center.y + 12.dp.toPx()),
-                                        end = Offset(center.x, center.y + 36.dp.toPx()),
-                                        strokeWidth = 3.dp.toPx()
-                                    )
-                                    drawLine(
-                                        color = rarityColor.copy(alpha = 0.8f),
-                                        start = Offset(center.x, center.y + 20.dp.toPx()),
-                                        end = Offset(center.x - 22.dp.toPx(), center.y - 12.dp.toPx()),
-                                        strokeWidth = 2.dp.toPx()
-                                    )
-                                    drawLine(
-                                        color = rarityColor.copy(alpha = 0.8f),
-                                        start = Offset(center.x, center.y + 20.dp.toPx()),
-                                        end = Offset(center.x + 22.dp.toPx(), center.y - 12.dp.toPx()),
-                                        strokeWidth = 2.dp.toPx()
-                                    )
-                                    // Glowing flower resin nodes
-                                    drawCircle(
-                                        color = rarityColor,
-                                        radius = 5.dp.toPx(),
-                                        center = Offset(center.x - 22.dp.toPx(), center.y - 12.dp.toPx())
-                                    )
-                                    drawCircle(
-                                        color = rarityColor,
-                                        radius = 5.dp.toPx(),
-                                        center = Offset(center.x + 22.dp.toPx(), center.y - 12.dp.toPx())
-                                    )
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = when (card.defaultRarity) {
-                                    "Legend" -> Icons.Default.Spa
-                                    "Epic" -> Icons.Default.Eco
-                                    "Rare" -> Icons.Default.LocalFlorist
-                                    else -> Icons.Default.Grass
-                                },
-                                contentDescription = localizedName,
-                                tint = Color.White,
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
-                    }
-
-                    // Card Name & Rider-Waite Mapping
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        ContrastText(
-                            text = localizedName.uppercase(),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontFamily = RajdhaniFontFamily,
-                            color = Color.White,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        ContrastText(
-                            text = "($localizedTraditional)",
-                            fontSize = 15.sp,
-                            fontFamily = RajdhaniFontFamily,
-                            color = Color.Yellow,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    // Orientation Status
-                    ContrastText(
-                        text = if (isUpright) "UPRIGHT" else "REVERSED",
-                        fontSize = 15.sp,
-                        fontFamily = RajdhaniFontFamily,
-                        color = if (isUpright) Color(0xFF39FF14) else Color(0xFFFF3366),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Mint Button (visible only when decrypted)
         if (isRevealed) {
@@ -3083,7 +2851,7 @@ fun InteractiveCyberCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Mint",
+                            contentDescription = "Mint $localizedName",
                             tint = CyberObsidian,
                             modifier = Modifier.size(14.dp)
                         )
@@ -3122,6 +2890,8 @@ fun InteractiveCyberCard(
                 isMarketView = false,
                 systemLanguage = lang,
                 skin = currentSkin,
+                isUpright = isUpright,
+                showOrientation = true,
                 onClose = { showFullScreenReview = false }
             )
         }
@@ -3349,30 +3119,35 @@ fun VaultScreen(viewModel: TarotViewModel) {
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Card Art Preview
-                            val imageResId = getCardImage(card.index)
-                            if (imageResId != null) {
-                                Image(
-                                    painter = painterResource(id = imageResId),
-                                    contentDescription = "${card.name} - Garden Art",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(100.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .border(2.dp, rarityColor, RoundedCornerShape(8.dp)),
-                                    contentScale = ContentScale.Crop
+                            // Card Art Preview (Unified Framed Tarot Artwork + WEED GURU PROPERTY Watermark)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(155.dp)
+                            ) {
+                                FramedTarotArtworkWindow(
+                                    card = card,
+                                    isUpright = true,
+                                    compactWatermark = true,
+                                    showDiagonalWatermark = true,
+                                    rarityBorderColor = rarityColor,
+                                    modifier = Modifier.fillMaxSize()
                                 )
-                            } else {
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(100.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .border(2.dp, rarityColor, RoundedCornerShape(8.dp))
-                                        .background(CyberCharcoal),
-                                    contentAlignment = Alignment.Center
+                                        .align(Alignment.TopStart)
+                                        .padding(6.dp)
+                                        .background(Color.Black.copy(alpha = 0.78f), RoundedCornerShape(6.dp))
+                                        .border(0.8.dp, NeonGold.copy(alpha = 0.7f), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
-                                    CardSymbolIcon(cardIndex = card.index, tintColor = rarityColor, modifier = Modifier.size(36.dp))
+                                    Text(
+                                        text = "${getArcanaRomanNumeral(card.index)} • ${getCard420Discipline(card.index).icon}",
+                                        fontFamily = OrbitronFontFamily,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = NeonGold
+                                    )
                                 }
                             }
 
@@ -3391,10 +3166,12 @@ fun VaultScreen(viewModel: TarotViewModel) {
                                 overflow = TextOverflow.Ellipsis
                             )
                             ContrastText(
-                                text = "Mapped: $localizedTraditional",
-                                fontSize = 16.sp,
+                                text = "${card.series} • $localizedTraditional",
+                                fontSize = 14.sp,
                                 fontFamily = RajdhaniFontFamily,
-                                color = Color.Yellow
+                                color = NeonGold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
 
                             HorizontalDivider(color = rarityColor.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 8.dp))
@@ -3772,6 +3549,7 @@ fun VaultScreen(viewModel: TarotViewModel) {
             isMarketView = false,
             systemLanguage = lang,
             skin = currentSkin,
+            actionLabel = if (lang == "ru") "УПРАВЛЕНИЕ NFT" else "MANAGE NFT",
             onClose = { cardToInspectReview = null },
             onActionClick = {
                 selectedMintedCard = mintedCard
@@ -4083,28 +3861,37 @@ fun MarketScreen(viewModel: TarotViewModel) {
                         Column(
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                        // Card Illustration occupies the whole card field width (full-bleed top banner)
-                        val thumbnailResId = getCardImage(card.index)
-                        if (thumbnailResId != null) {
-                            Image(
-                                painter = painterResource(id = thumbnailResId),
-                                contentDescription = "${card.name} - Illustration",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
-                                    .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)),
-                                contentScale = ContentScale.Crop
+                        // Card Illustration with Unified Tarot Frame & WEED GURU PROPERTY Watermark
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(225.dp)
+                                .padding(horizontal = 10.dp, vertical = 10.dp)
+                        ) {
+                            FramedTarotArtworkWindow(
+                                card = card,
+                                isUpright = true,
+                                compactWatermark = false,
+                                showDiagonalWatermark = true,
+                                rarityBorderColor = rarityColor,
+                                cornerRadius = 10,
+                                modifier = Modifier.fillMaxSize()
                             )
-                        } else {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
-                                    .background(CyberCharcoal)
-                                    .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)),
-                                contentAlignment = Alignment.Center
+                                    .align(Alignment.TopStart)
+                                    .padding(8.dp)
+                                    .background(Color.Black.copy(alpha = 0.80f), RoundedCornerShape(6.dp))
+                                    .border(0.9.dp, NeonGold.copy(alpha = 0.8f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
                             ) {
-                                CardSymbolIcon(cardIndex = card.index, tintColor = rarityColor, modifier = Modifier.size(72.dp))
+                                Text(
+                                    text = "${getArcanaRomanNumeral(card.index)} • ${card.series.uppercase()}",
+                                    fontFamily = OrbitronFontFamily,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NeonGold
+                                )
                             }
                         }
 
@@ -4390,37 +4177,37 @@ fun MarketScreen(viewModel: TarotViewModel) {
 
 fun getCardImage(cardIndex: Int): Int? {
     return when (cardIndex) {
-        0 -> R.drawable.img_the_fool_1782996863113
-        1 -> R.drawable.img_the_netrunner_1783468576249
-        2 -> R.drawable.img_cyber_tarot_witch_1783983295253
-        3 -> R.drawable.img_van_gogh_starry_herb_1783981881044
-        4 -> R.drawable.img_van_gogh_sunflowers_bud_1783981894692
-        5 -> R.drawable.img_van_gogh_irises_leaves_1783981907333
-        6 -> R.drawable.img_the_ai_oracle_1783468589540
-        7 -> R.drawable.img_the_sysadmin_1783468611107
-        8 -> R.drawable.img_the_mainframe_1783468599161
-        9 -> R.drawable.img_cyber_alchemy_lab_1783983282176
-        10 -> R.drawable.img_cyber_fantasy_neon_garden_1783983267886
-        11 -> R.drawable.img_the_global_network_1783468623225
-        12 -> R.drawable.img_card_12_flushing_stage_1784330116067
-        13 -> R.drawable.img_card_13_harvest_1784330129988
-        14 -> R.drawable.img_card_14_climate_controller_1784330140630
-        15 -> R.drawable.img_card_15_spider_mite_attack_1784330152550
-        16 -> R.drawable.img_card_16_crop_collapse_1784330162213
-        17 -> R.drawable.img_card_17_trichome_sparkle_1784330173456
-        18 -> R.drawable.img_card_18_guerrilla_growing_1784330187119
-        19 -> R.drawable.img_card_19_grow_light_1784330200766
-        20 -> R.drawable.img_card_20_cup_submission_1784330210940
-        21 -> R.drawable.img_card_21_green_planet_1784330222449
-        22 -> R.drawable.img_card_22_electron_1784675315017
-        23 -> R.drawable.img_card_23_proton_core_1784675327500
-        24 -> R.drawable.img_card_24_hydrogen_atom_1784675346980
-        25 -> R.drawable.img_card_25_dna_helix_1784675358888
-        26 -> R.drawable.img_card_26_genesis_singularity_1784675370658
-        27 -> R.drawable.amber_baltic_resin_1784675823170
-        28 -> R.drawable.amber_trichomes_1784675836926
-        29 -> R.drawable.ocean_coral_reef_1784675848971
-        30 -> R.drawable.ocean_leviathan_1784675860484
+        0 -> R.drawable.img_card_00_sprout_1794505405019
+        1 -> R.drawable.img_card_01_budtender_v2_1794566668115
+        2 -> R.drawable.img_card_02_hash_queen_1794505432186
+        3 -> R.drawable.img_card_03_mother_plant_1794505443960
+        4 -> R.drawable.img_card_04_grow_master_1794505457551
+        5 -> R.drawable.img_card_05_old_grower_1794505471438
+        6 -> R.drawable.img_card_06_terpene_symbiosis_1794505485665
+        7 -> R.drawable.img_card_07_autoflower_rush_1794505499624
+        8 -> R.drawable.img_card_08_super_cropping_1794505513012
+        9 -> R.drawable.img_card_09_curing_room_1794505526829
+        10 -> R.drawable.img_card_10_pheno_hunt_1794505539718
+        11 -> R.drawable.img_card_11_organic_balance_1794505555778
+        12 -> R.drawable.img_card_12_flushing_stage_1794566585071
+        13 -> R.drawable.img_card_13_harvest_1794566585432
+        14 -> R.drawable.img_card_14_climate_controller_1794566587382
+        15 -> R.drawable.img_card_15_spider_mite_attack_v2_1794566668223
+        16 -> R.drawable.img_card_16_crop_collapse_1794566586939
+        17 -> R.drawable.img_card_17_trichome_sparkle_1794566603781
+        18 -> R.drawable.img_card_18_guerrilla_growing_1794566605208
+        19 -> R.drawable.img_card_19_grow_light_1794566604902
+        20 -> R.drawable.img_card_20_cup_submission_1794566605638
+        21 -> R.drawable.img_card_21_green_planet_1794566606404
+        22 -> R.drawable.img_card_22_genesis_electron_1794566622200
+        23 -> R.drawable.img_card_23_genesis_proton_1794566623656
+        24 -> R.drawable.img_card_24_genesis_hydrogen_1794566623123
+        25 -> R.drawable.img_card_25_genesis_dna_1794566624227
+        26 -> R.drawable.img_card_26_genesis_singularity_1794566625883
+        27 -> R.drawable.img_card_27_amber_resin_1794566645693
+        28 -> R.drawable.img_card_28_amber_trichomes_1794566646336
+        29 -> R.drawable.img_card_29_ocean_coral_1794566646598
+        30 -> R.drawable.img_card_30_ocean_leviathan_v2_1794566668019
         else -> null
     }
 }
@@ -4430,7 +4217,7 @@ fun getCardBackImage(series: String): Int {
         "Genesis Series" -> R.drawable.back_genesis_series_1792151368530
         "Amber Series" -> R.drawable.back_amber_series_1792151382337
         "Seas & Oceans" -> R.drawable.back_ocean_series_1792151396531
-        else -> R.drawable.img_card_back_cyber_luxury
+        else -> R.drawable.back_cyber_botanica_1792151356014
     }
 }
 
@@ -5031,7 +4818,8 @@ fun DeckScreen(viewModel: TarotViewModel) {
                     items(filteredCards) { card ->
                         val rarityColor = remember(card.defaultRarity) {
                             when (card.defaultRarity) {
-                                "Legend" -> NeonGold
+                                "Genesis" -> NeonGold
+                                "Legend" -> NeonAmber
                                 "Epic" -> NeonMagenta
                                 "Rare" -> NeonCyan
                                 else -> NeonGreen
@@ -5049,194 +4837,35 @@ fun DeckScreen(viewModel: TarotViewModel) {
                         }
 
                         val isFlipped = flippedCardsMap[card.index] ?: false
-                        val rotation by animateFloatAsState(
-                            targetValue = if (isFlipped) 180f else 0f,
-                            animationSpec = tween(
-                                durationMillis = 600,
-                                easing = FastOutSlowInEasing
-                            ),
-                            label = "deck_card_flip"
-                        )
-
-                        // Compute dynamic grid coordinate
-                        val rowIdx = card.index / columnCount
-                        val colIdx = card.index % columnCount
-                        val coordLabel = "R${String.format("%02d", rowIdx + 1)}:C${String.format("%02d", colIdx + 1)}"
-
                         val cardOuterGlow = if (presetStyle == "Neon Matrix Grid") glowSpread.dp * 1.5f else glowSpread.dp
 
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (presetStyle == "Neon Matrix Grid") CyberCharcoal.copy(alpha = 0.75f) else CyberCharcoal
-                            ),
-                            border = BorderStroke(
-                                width = if (presetStyle == "Standard CSS Grid") 1.dp else 1.5.dp,
-                                color = if (isFlipped) chosenGlowColor else CyberMutedBlue
-                            ),
-                            shape = RoundedCornerShape(12.dp),
+                        WeedGuruTarotCard(
+                            card = card,
+                            isUpright = true,
+                            isFlipped = isFlipped,
+                            compact = columnCount >= 3,
+                            systemLanguage = lang,
+                            showTraditionalAsPrimary = infoMode != "Digital Analog",
+                            showOrientationBadge = false,
+                            showRarityShader = presetStyle != "Standard CSS Grid",
+                            glowColorOverride = chosenGlowColor,
+                            onFlipClick = {
+                                flippedCardsMap[card.index] = !isFlipped
+                                com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CLICK)
+                            },
+                            onCardClick = {
+                                selectedInspectCard = card
+                                com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CARD_DRAW)
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(220.dp)
                                 .neonGlowEffect(
-                                    color = if (isFlipped) chosenGlowColor else chosenGlowColor.copy(alpha = 0.3f),
+                                    color = if (isFlipped) chosenGlowColor else chosenGlowColor.copy(alpha = 0.35f),
                                     radius = cardOuterGlow,
                                     pulseFactor = if (presetStyle == "Neon Matrix Grid") pulseFactor else 1.0f,
                                     cornerRadius = 12.dp
                                 )
-                                .clickable {
-                                    selectedInspectCard = card
-                                    com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CARD_DRAW)
-                                }
-                                .graphicsLayer {
-                                    rotationY = rotation
-                                    cameraDistance = 12 * density
-                                }
-                        ) {
-                            if (rotation <= 90f) {
-                                // Card Front view (default in deck)
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(10.dp),
-                                    verticalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = if (presetStyle == "Holographic Command Table") "[$coordLabel]" else "NODE #${String.format("%02d", card.index)}",
-                                                fontSize = 14.sp,
-                                                fontFamily = RajdhaniFontFamily,
-                                                color = if (presetStyle == "Holographic Command Table") NeonCyan else Color(0xFFB0B0C5)
-                                            )
-                                            Text(
-                                                text = card.defaultRarity.uppercase(),
-                                                fontSize = 17.sp,
-                                                fontFamily = RajdhaniFontFamily,
-                                                color = rarityColor,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.height(4.dp))
-
-                                        // Central Artwork Area (Post-Impressionist/Van Gogh Tarot Artwork)
-                                        val imgResId = getCardImage(card.index)
-                                        if (imgResId != null) {
-                                            Image(
-                                                painter = painterResource(id = imgResId),
-                                                contentDescription = "${card.name} - Art Preview",
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(68.dp)
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .border(1.dp, rarityColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp)),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(68.dp)
-                                                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                                                    .border(0.5.dp, rarityColor.copy(alpha = 0.3f), RoundedCornerShape(6.dp)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                CardSymbolIcon(
-                                                    cardIndex = card.index,
-                                                    tintColor = rarityColor,
-                                                    modifier = Modifier.size(32.dp)
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(4.dp))
-
-                                        val localizedName = CardLocalizationHelper.getLocalizedName(card.index, lang)
-                                        val localizedTraditional = CardLocalizationHelper.getLocalizedTraditionalName(card.index, lang)
-                                        
-                                        Text(
-                                            text = if (infoMode == "Digital Analog") localizedName else localizedTraditional,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            fontFamily = RajdhaniFontFamily,
-                                            color = Color.White,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = if (infoMode == "Digital Analog") "($localizedTraditional)" else "($localizedName)",
-                                            fontSize = 16.sp,
-                                            fontFamily = RajdhaniFontFamily,
-                                            color = Color.Yellow,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-
-                                    CyberButton(
-                                        onClick = {
-                                            selectedInspectCard = card
-                                            com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CARD_DRAW)
-                                        },
-                                        skin = currentSkin,
-                                        containerColor = rarityColor,
-                                        contentColor = CyberObsidian,
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(30.dp)
-                                    ) {
-                                        AutoResizingText(
-                                            text = "INSPECT ⛶",
-                                            targetTextSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = RajdhaniFontFamily,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                            } else {
-                                // Card Back view with Ornate Series Design (flipped)
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .graphicsLayer { rotationY = 180f }
-                                        .clip(RoundedCornerShape(12.dp))
-                                ) {
-                                    val backImgRes = getCardBackImage(card.series)
-                                    Image(
-                                        painter = painterResource(id = backImgRes),
-                                        contentDescription = "${card.series} Back",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .fillMaxWidth()
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    listOf(Color.Transparent, Color(0xCC05050A))
-                                                )
-                                            )
-                                            .padding(bottom = 6.dp, top = 16.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = card.series.uppercase(),
-                                            fontSize = 14.sp,
-                                            fontFamily = RajdhaniFontFamily,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        )
                     }
                 }
             }
@@ -5259,7 +4888,7 @@ fun DeckScreen(viewModel: TarotViewModel) {
         }
     }
 
-    // Detail Modal for selected inspect card (Styled with full Neon and cyber grid aesthetic)
+    // Fullscreen Card Review for selected inspect card (frameless + card back support)
     selectedInspectCard?.let { card ->
         FullScreenCardReview(
             card = card,
@@ -5267,6 +4896,7 @@ fun DeckScreen(viewModel: TarotViewModel) {
             isMarketView = false,
             systemLanguage = lang,
             skin = currentSkin,
+            initiallyFlipped = flippedCardsMap[card.index] ?: false,
             onClose = { selectedInspectCard = null },
             onActionClick = { selectedInspectCard = null }
         )
@@ -9701,7 +9331,7 @@ fun SecureCommsPanel(viewModel: TarotViewModel) {
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = "ALGORITHM: AES-256-ECB / PKCS5",
+                                            text = "ALGORITHM: AES-256-GCM / 12-byte IV",
                                             fontFamily = RajdhaniFontFamily,
                                             fontSize = 16.sp,
                                             color = Color(0xFFB0B0C5)
@@ -11368,24 +10998,26 @@ fun OnChainNftPanel(viewModel: TarotViewModel) {
                                 )
                             }
                             
-                            val localUri = android.net.Uri.parse(nft.explorerUrl)
-                            val context = androidx.compose.ui.platform.LocalContext.current
-                            CyberTextButton(
-                                onClick = {
-                                    try {
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, localUri)
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        // Silent catch if no browser installed
-                                    }
-                                },
-                                text = "EXPLORER",
-                                skin = currentSkin,
-                                containerColor = Color.Transparent,
-                                contentColor = NeonCyan,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.height(28.dp)
-                            )
+                            if (nft.explorerUrl.isNotBlank()) {
+                                val localUri = android.net.Uri.parse(nft.explorerUrl)
+                                val context = androidx.compose.ui.platform.LocalContext.current
+                                CyberTextButton(
+                                    onClick = {
+                                        try {
+                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, localUri)
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            // Silent catch if no browser installed
+                                        }
+                                    },
+                                    text = "EXPLORER",
+                                    skin = currentSkin,
+                                    containerColor = Color.Transparent,
+                                    contentColor = NeonCyan,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.height(28.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -12225,7 +11857,6 @@ fun NeuralAdsPanel(viewModel: TarotViewModel) {
 // ==========================================
 // FULL-SCREEN IMMERSIVE CARD REVIEW SYSTEM
 // ==========================================
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FullScreenCardReview(
     card: CyberTarotCard,
@@ -12233,402 +11864,23 @@ fun FullScreenCardReview(
     isMarketView: Boolean = false,
     systemLanguage: String = "en",
     skin: CyberSkin = CyberSkin.JAMAICA,
+    isUpright: Boolean = true,
+    showOrientation: Boolean = false,
+    initiallyFlipped: Boolean = false,
+    actionLabel: String? = if (isMarketView) "ACQUIRE NODE SYSTEM" else null,
     onClose: () -> Unit,
     onActionClick: () -> Unit = {}
 ) {
-    var isFlipped by remember { mutableStateOf(false) }
-
-    val localizedName = CardLocalizationHelper.getLocalizedName(card.index, systemLanguage)
-    val localizedTraditional = CardLocalizationHelper.getLocalizedTraditionalName(card.index, systemLanguage)
-    val localizedDesc = CardLocalizationHelper.getLocalizedDescription(card.index, systemLanguage)
-    val localizedCircuitry = CardLocalizationHelper.getLocalizedCircuitryElement(card.index, systemLanguage)
-
-    // Dialog layout styled as full screen/immersive
-    AlertDialog(
-        onDismissRequest = onClose,
-        properties = androidx.compose.ui.window.DialogProperties(
-            usePlatformDefaultWidth = false // this enables full-screen dialog layout
-        ),
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xE605050A)), // solid dark neon wash
-        content = {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                // Background matrix particle visual simulation
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    // Draw clean background glowing rings
-                    drawCircle(
-                        color = NeonCyan.copy(alpha = 0.05f),
-                        radius = size.minDimension / 1.5f,
-                        center = center,
-                        style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f))
-                    )
-                    drawCircle(
-                        color = NeonMagenta.copy(alpha = 0.03f),
-                        radius = size.minDimension / 2f,
-                        center = center,
-                        style = Stroke(width = 2.dp.toPx())
-                    )
-                }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight()
-                        .verticalScroll(rememberScrollState()),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    // Header / Top controls
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                "NEURAL ANALOG REVIEW",
-                                color = NeonCyan,
-                                fontSize = 15.sp,
-                                fontFamily = RajdhaniFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.5.sp
-                            )
-                            Text(
-                                localizedName.uppercase(),
-                                color = Color.White,
-                                fontSize = 24.sp,
-                                fontFamily = RajdhaniFontFamily,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        IconButton(
-                            onClick = onClose,
-                            modifier = Modifier
-                                .background(Color.White.copy(alpha = 0.05f), CircleShape)
-                                .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
-                        ) {
-                            Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-                        }
-                    }
-
-                    // Rotating Cyber Card Container
-                    val rotationState by animateFloatAsState(
-                        targetValue = if (isFlipped) 180f else 0f,
-                        animationSpec = tween(600, easing = LinearOutSlowInEasing),
-                        label = "cardFlip"
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .graphicsLayer {
-                                rotationY = rotationState
-                                cameraDistance = 12 * density
-                            }
-                            .clickable {
-                                if (!isFlipped) {
-                                    // 2nd tap: flip card to show back/shirt
-                                    isFlipped = true
-                                    com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CARD_DRAW)
-                                } else {
-                                    // 3rd tap: return from full-screen back to original screen
-                                    com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CLICK)
-                                    onClose()
-                                }
-                            }
-                            .width(290.dp)
-                            .height(440.dp)
-                            .shadow(24.dp, RoundedCornerShape(16.dp), ambientColor = NeonCyan, spotColor = NeonMagenta)
-                            .background(CyberCharcoal, RoundedCornerShape(16.dp))
-                            .border(
-                                width = 2.dp,
-                                brush = Brush.linearGradient(
-                                    colors = if (mintedCard?.rarity == "Legend") listOf(NeonGold, NeonMagenta)
-                                            else if (mintedCard?.rarity == "Epic") listOf(NeonMagenta, NeonCyan)
-                                            else if (mintedCard?.rarity == "Rare") listOf(NeonCyan, NeonGreen)
-                                            else listOf(NeonGreen, Color.DarkGray)
-                                ),
-                                shape = RoundedCornerShape(16.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Card Content based on rotation
-                        if (rotationState <= 90f) {
-                            // FRONT SIDE
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                CyberRarityShaderOverlay(
-                                    rarity = mintedCard?.rarity ?: card.defaultRarity,
-                                    modifier = Modifier
-                                        .matchParentSize()
-                                        .clip(RoundedCornerShape(16.dp))
-                                )
-                                Column(
-                                    modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(14.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    // Top status indicators
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        CyberRarityGlowBadge(
-                                            rarity = mintedCard?.rarity ?: card.defaultRarity
-                                        )
-                                    Text(
-                                        text = mintedCard?.let { "#${String.format("%04d", it.mintNumber)}" } ?: "SYS_REF",
-                                        fontSize = 14.sp,
-                                        fontFamily = RajdhaniFontFamily,
-                                        color = Color(0xFFB0B0C5)
-                                    )
-                                }
-
-                                // Central Premium Cyberpunk Artwork
-                                val cardRes = getCardImage(card.index)
-                                if (cardRes != null) {
-                                    Image(
-                                        painter = painterResource(id = cardRes),
-                                        contentDescription = localizedName,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(250.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .border(
-                                                width = 1.5.dp,
-                                                color = when (mintedCard?.rarity ?: card.defaultRarity) {
-                                                    "Legend" -> NeonGold
-                                                    "Epic" -> NeonMagenta
-                                                    "Rare" -> NeonCyan
-                                                    else -> NeonGreen
-                                                },
-                                                shape = RoundedCornerShape(12.dp)
-                                            ),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                } else {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(250.dp)
-                                            .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CardSymbolIcon(
-                                            cardIndex = card.index,
-                                            tintColor = when (mintedCard?.rarity ?: card.defaultRarity) {
-                                                "Legend" -> NeonGold
-                                                "Epic" -> NeonMagenta
-                                                "Rare" -> NeonCyan
-                                                else -> NeonGreen
-                                            },
-                                            modifier = Modifier.size(64.dp)
-                                        )
-                                    }
-                                }
-
-                                // Bottom identity block & Flip hint
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = localizedName.uppercase(),
-                                        fontSize = 15.sp,
-                                        fontFamily = RajdhaniFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                    Text(
-                                        text = localizedCircuitry.uppercase(),
-                                        fontSize = 14.sp,
-                                        fontFamily = RajdhaniFontFamily,
-                                        color = NeonCyan,
-                                        modifier = Modifier.padding(top = 2.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(Color.White.copy(alpha = 0.08f))
-                                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = if (systemLanguage == "ru") "ТАП: ПЕРЕВЕРНУТЬ (РУБАШКА) ↻" else "TAP: FLIP TO SHIRT ↻",
-                                            color = NeonCyan,
-                                            fontSize = 14.sp,
-                                            fontFamily = RajdhaniFontFamily,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        } else {
-                            // BACK SIDE: Ornate Series-specific card back artwork
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer { rotationY = 180f }
-                                    .clip(RoundedCornerShape(16.dp))
-                            ) {
-                                val backResId = getCardBackImage(card.series)
-                                Image(
-                                    painter = painterResource(id = backResId),
-                                    contentDescription = "${card.series} Card Back",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-
-                                // Overlay badge with series name and tap hint
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .fillMaxWidth()
-                                        .background(
-                                            Brush.verticalGradient(
-                                                listOf(Color.Transparent, Color(0xDD0A0918))
-                                            )
-                                        )
-                                        .padding(bottom = 12.dp, top = 24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(
-                                            text = card.series.uppercase(),
-                                            color = when (card.series) {
-                                                "Genesis Series" -> Color(0xFFFFD700)
-                                                "Amber Series" -> Color(0xFFFF9900)
-                                                "Seas & Oceans" -> NeonCyan
-                                                else -> NeonGreen
-                                            },
-                                            fontSize = 16.sp,
-                                            fontFamily = RajdhaniFontFamily,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = if (systemLanguage == "ru") "3-Й ТАП: ВЕРНУТЬСЯ В ИСХОДНЫЙ ВИД ✕" else "3RD TAP: RETURN TO VIEW ✕",
-                                            color = NeonGold,
-                                            fontSize = 14.sp,
-                                            fontFamily = RajdhaniFontFamily,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Node Specification Lore section
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = CyberCharcoal),
-                        border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = "CORE SPECIFICATION MATRIX",
-                                fontSize = 16.sp,
-                                color = NeonCyan,
-                                fontFamily = RajdhaniFontFamily,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = localizedDesc,
-                                fontSize = 16.sp,
-                                color = Color.White,
-                                fontFamily = RajdhaniFontFamily,
-                                lineHeight = 15.sp
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = "Traditional Equiv: ",
-                                    fontSize = 15.sp,
-                                    color = Color(0xFFB0B0C5),
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = localizedTraditional,
-                                    fontSize = 15.sp,
-                                    color = NeonMagenta,
-                                    fontFamily = RajdhaniFontFamily
-                                )
-                            }
-                            Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                                Text(
-                                    text = "Circuitry Bus: ",
-                                    fontSize = 15.sp,
-                                    color = Color(0xFFB0B0C5),
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = localizedCircuitry,
-                                    fontSize = 15.sp,
-                                    color = NeonGreen,
-                                    fontFamily = RajdhaniFontFamily
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Actions block depending on the view
-                    if (isMarketView) {
-                        CyberButton(
-                            onClick = onActionClick,
-                            skin = skin,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp)
-                                .height(48.dp)
-                        ) {
-                            AutoResizingText(
-                                text = "ACQUIRE NODE SYSTEM",
-                                targetTextSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = RajdhaniFontFamily,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    } else {
-                        CyberButton(
-                            onClick = onActionClick,
-                            skin = skin,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp)
-                                .height(48.dp)
-                        ) {
-                            AutoResizingText(
-                                text = "NODE SYSTEM UTILITIES",
-                                targetTextSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = RajdhaniFontFamily,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
-            }
-        }
+    WeedGuruFullscreenCardViewer(
+        card = card,
+        isUpright = isUpright,
+        initiallyFlipped = initiallyFlipped,
+        systemLanguage = systemLanguage,
+        showOrientation = showOrientation,
+        mintBadgeText = mintedCard?.let { "#${String.format("%04d", it.mintNumber)}" },
+        actionLabel = actionLabel,
+        onActionClick = if (actionLabel != null) onActionClick else null,
+        onDismiss = onClose
     )
 }
 
@@ -13346,7 +12598,7 @@ fun SwarmStoragePanel(viewModel: TarotViewModel) {
                         
                         // Passphrase Input
                         Text(
-                            text = "CONTAINER MASTER PASSPHRASE (derived via PBKDF2/SHA-256)",
+                            text = "CONTAINER MASTER PASSPHRASE (derived via PBKDF2-HMAC-SHA256, 210,000 iterations)",
                             fontFamily = RajdhaniFontFamily,
                             fontSize = 15.sp,
                             color = Color(0xFFB0B0C5)

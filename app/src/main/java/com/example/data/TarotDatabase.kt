@@ -19,7 +19,7 @@ import androidx.room.RoomDatabase
         SavedDeck::class,
         CardUpgrade::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class TarotDatabase : RoomDatabase() {

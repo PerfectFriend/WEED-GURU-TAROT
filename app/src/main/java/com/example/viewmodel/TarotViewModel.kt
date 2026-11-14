@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import com.example.data.crypto.CryptoHelper
 import kotlinx.coroutines.Delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -722,6 +723,12 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val _pinFailedAttempts = MutableStateFlow(0)
+    val pinFailedAttempts: StateFlow<Int> = _pinFailedAttempts.asStateFlow()
+
+    private val _lockoutUntilMs = MutableStateFlow(0L)
+    val lockoutUntilMs: StateFlow<Long> = _lockoutUntilMs.asStateFlow()
+
     fun triggerPanicReset() {
         viewModelScope.launch {
             repository.triggerPanicResetComplete()
@@ -732,29 +739,59 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun unlockApp(pin: String): Boolean {
-        val profile = userProfile.value ?: return false
-        return when (pin) {
-            profile.pinCode -> {
-                _isUnlockedThisSession.value = true
-                _isSafeBotanicalMode.value = false
-                _uiNotification.value = "🔓 Decryption keys unlocked. Welcome back, ${profile.alias}."
-                true
-            }
-            profile.pinSafeMode -> {
-                _isUnlockedThisSession.value = true
-                _isSafeBotanicalMode.value = true
-                _uiNotification.value = "🛡️ Harmless Mode unlocked. Safe environment loaded."
-                true
-            }
-            profile.pinPanicMode -> {
-                triggerPanicReset()
-                true
-            }
-            else -> {
-                _uiNotification.value = "❌ INVALID SECURITY PIN CODE. ATTEMPT LOGGED."
-                false
-            }
+        val now = System.currentTimeMillis()
+        if (now < _lockoutUntilMs.value) {
+            val secondsLeft = ((_lockoutUntilMs.value - now) / 1000) + 1
+            _uiNotification.value = "⛔ ACCESS TEMPORARILY LOCKED: Wait ${secondsLeft}s before retrying."
+            return false
         }
+
+        val profile = userProfile.value ?: runCatching {
+            kotlinx.coroutines.runBlocking(Dispatchers.IO) { repository.getUserProfileSync() }
+        }.getOrNull() ?: return false
+
+        // If profile has no PIN configured
+        if (profile.pinCode.isBlank()) {
+            _isUnlockedThisSession.value = true
+            _isSafeBotanicalMode.value = false
+            return true
+        }
+
+        // Constant-time comparison for primary PIN
+        if (CryptoHelper.constantTimeEquals(pin, profile.pinCode)) {
+            _pinFailedAttempts.value = 0
+            _isUnlockedThisSession.value = true
+            _isSafeBotanicalMode.value = false
+            _uiNotification.value = "🔓 Decryption keys unlocked. Welcome back, ${profile.alias}."
+            return true
+        }
+
+        // Constant-time comparison for optional safe decoy PIN
+        val safePin = profile.pinSafeMode
+        if (!safePin.isNullOrBlank() && CryptoHelper.constantTimeEquals(pin, safePin)) {
+            _pinFailedAttempts.value = 0
+            _isUnlockedThisSession.value = true
+            _isSafeBotanicalMode.value = true
+            _uiNotification.value = "🛡️ Harmless Mode unlocked. Safe environment loaded."
+            return true
+        }
+
+        // PANIC BACKDOOR ELIMINATED: Entering a PIN never triggers database wipe.
+        val currentAttempts = _pinFailedAttempts.value + 1
+        _pinFailedAttempts.value = currentAttempts
+
+        if (currentAttempts >= 5) {
+            _lockoutUntilMs.value = now + 30_000L // 30 seconds rate-limit lockout
+            _uiNotification.value = "⛔ MAXIMUM ATTEMPTS EXCEEDED: Terminal locked for 30 seconds."
+        } else {
+            val remaining = 5 - currentAttempts
+            _uiNotification.value = "❌ INVALID SECURITY PIN CODE ($remaining attempts remaining). ATTEMPT LOGGED."
+        }
+
+        viewModelScope.launch {
+            repository.logFailedSecurityAttempt(pin.length)
+        }
+        return false
     }
 
     fun lockApp() {
@@ -926,8 +963,7 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
     fun sendEncryptedMessage(contactId: Int, plaintext: String) {
         if (plaintext.isBlank()) return
         viewModelScope.launch {
-            val key = "SECURE_KEY_CH_${contactId}"
-            repository.sendEncryptedMessage(contactId, "Me", plaintext, key)
+            repository.sendEncryptedMessage(contactId, "Me", plaintext)
         }
     }
 
