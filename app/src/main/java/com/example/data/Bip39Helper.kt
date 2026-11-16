@@ -1,33 +1,56 @@
 package com.example.data
 
+import com.example.data.crypto.CryptoHelper
 import java.security.MessageDigest
+import java.security.SecureRandom
+import java.text.Normalizer
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 
 /**
- * BIP-39 compliant mnemonic generator and validator.
- * Generates and validates standard BIP-39 mnemonics compatible with industry hardware
- * and software cryptocurrency wallets.
+ * BIP-39 compliant mnemonic generator, validator, and PBKDF2-HMAC-SHA512 seed deriver.
+ * Generates and validates standard BIP-39 mnemonics compatible with hardware/software wallets.
  */
 object Bip39Helper {
 
+    private val secureRandom = SecureRandom()
     private val wordlist get() = Bip39Wordlist.words
     private val wordToIndex by lazy {
         wordlist.mapIndexed { index, word -> word to index }.toMap()
     }
 
     /**
-     * Combines user-specified entropy words into a stable 256-bit (32-byte) entropy source.
-     * Each word is trimmed and lowercased for consistency.
+     * Generates cryptographically secure random entropy (default 256 bits = 32 bytes -> 24 words).
+     */
+    fun generateRandomEntropy(bits: Int = 256): ByteArray {
+        require(bits == 128 || bits == 256) { "Supported BIP-39 entropy sizes: 128 or 256 bits" }
+        val bytes = ByteArray(bits / 8)
+        secureRandom.nextBytes(bytes)
+        return bytes
+    }
+
+    /**
+     * Combines user-specified entropy words into a 256-bit source using PBKDF2-HMAC-SHA256
+     * (210,000 iterations) rather than single-pass unsalted SHA-256.
      */
     fun generateEntropyFromWords(words: List<String>): ByteArray {
         val cleanWords = words.map { it.trim().lowercase() }
         val rawInput = cleanWords.joinToString("|")
-        val md = MessageDigest.getInstance("SHA-256")
-        return md.digest(rawInput.toByteArray(Charsets.UTF_8))
+        val salt = MessageDigest.getInstance("SHA-256")
+            .digest("WEEDGURU_WORDS_ENTROPY_V2".toByteArray(Charsets.UTF_8))
+        return CryptoHelper.deriveKeyPbkdf2(
+            passphrase = rawInput.toCharArray(),
+            salt = salt,
+            iterations = CryptoHelper.PBKDF2_ITERATIONS,
+            keyLengthBits = 256
+        ).encoded
     }
 
     /**
-     * Hashes user details into a stable 256-bit (32-byte) entropy source.
+     * Key-stretched deterministic fallback entropy derivation (PBKDF2-HMAC-SHA256, 210,000 iterations).
+     * Deprecated for primary wallet creation: always prefer [generateRandomEntropy].
      */
+    @Deprecated("Brain-wallet derivation from PII is weak; prefer generateRandomEntropy()")
     fun generateEntropyHash(
         birthdate: String,
         firstName: String,
@@ -37,18 +60,44 @@ object Bip39Helper {
         val cleanBirthdate = birthdate.trim()
         val cleanFirst = firstName.trim().lowercase()
         val cleanLast = lastName.trim().lowercase()
-        val cleanPass = password
-
-        val rawInput = "$cleanBirthdate|$cleanFirst|$cleanLast|$cleanPass"
-        val md = MessageDigest.getInstance("SHA-256")
-        return md.digest(rawInput.toByteArray(Charsets.UTF_8))
+        val rawInput = "$cleanBirthdate|$cleanFirst|$cleanLast|$password"
+        val salt = MessageDigest.getInstance("SHA-256")
+            .digest("WEEDGURU_RECOVERY_ENTROPY_V2".toByteArray(Charsets.UTF_8))
+        return CryptoHelper.deriveKeyPbkdf2(
+            passphrase = rawInput.toCharArray(),
+            salt = salt,
+            iterations = CryptoHelper.PBKDF2_ITERATIONS,
+            keyLengthBits = 256
+        ).encoded
     }
 
     /**
-     * Generates a BIP-39 compliant mnemonic from entropy.
-     * Supported entropy lengths:
-     * - 16 bytes (128 bits) -> 12 words (128 bits entropy + 4 bits checksum = 132 bits)
-     * - 32 bytes (256 bits) -> 24 words (256 bits entropy + 8 bits checksum = 264 bits)
+     * Canonical BIP-39 Seed Derivation:
+     * Derives a 64-byte (512-bit) binary seed from a mnemonic phrase + optional passphrase
+     * using PBKDF2-HMAC-SHA512 with 2048 iterations and NFKD normalization.
+     */
+    fun mnemonicToSeed(words: List<String>, passphrase: String = ""): ByteArray {
+        require(words.size == 12 || words.size == 24) { "Mnemonic must contain 12 or 24 words" }
+        val normalizedMnemonic = Normalizer.normalize(
+            words.joinToString(" ") { it.trim().lowercase() },
+            Normalizer.Form.NFKD
+        )
+        val normalizedSalt = Normalizer.normalize(
+            "mnemonic$passphrase",
+            Normalizer.Form.NFKD
+        ).toByteArray(Charsets.UTF_8)
+
+        val spec = PBEKeySpec(normalizedMnemonic.toCharArray(), normalizedSalt, 2048, 512)
+        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512")
+        return try {
+            factory.generateSecret(spec).encoded
+        } finally {
+            spec.clearPassword()
+        }
+    }
+
+    /**
+     * Generates a BIP-39 compliant mnemonic from entropy (16 bytes -> 12 words, 32 bytes -> 24 words).
      */
     fun generateMnemonic(entropy: ByteArray): List<String> {
         require(entropy.size == 16 || entropy.size == 32) {
@@ -60,15 +109,12 @@ object Bip39Helper {
         val totalBits = entBits + csBits
         val wordCount = totalBits / 11
 
-        // Checksum is the first csBits of SHA-256(entropy)
         val md = MessageDigest.getInstance("SHA-256")
         val hash = md.digest(entropy)
 
-        // Construct bit array
         val bits = BooleanArray(totalBits)
         var bitIndex = 0
 
-        // 1. Add entropy bits
         for (i in entropy.indices) {
             val byteValue = entropy[i].toInt() and 0xFF
             for (b in 7 downTo 0) {
@@ -76,13 +122,11 @@ object Bip39Helper {
             }
         }
 
-        // 2. Add checksum bits from the first hash byte(s)
         val hashByte = hash[0].toInt() and 0xFF
         for (b in 7 downTo (8 - csBits)) {
             bits[bitIndex++] = ((hashByte shr b) and 1) == 1
         }
 
-        // 3. Convert bit groups of 11 into wordlist indices
         val resultWords = ArrayList<String>(wordCount)
         val wordsList = wordlist
 
@@ -121,7 +165,7 @@ object Bip39Helper {
         }
 
         val totalBits = cleanWords.size * 11
-        val csBits = totalBits / 33 // 4 bits for 12 words, 8 bits for 24 words
+        val csBits = totalBits / 33
         val entBits = totalBits - csBits
         val entBytesCount = entBits / 8
 

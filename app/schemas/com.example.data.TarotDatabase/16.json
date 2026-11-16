@@ -1,0 +1,1378 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 16,
+    "identityHash": "28b0574032eb76d2f37b3b580ba31f46",
+    "entities": [
+      {
+        "tableName": "user_profile",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `username` TEXT NOT NULL, `weed` INTEGER NOT NULL, `totalDraws` INTEGER NOT NULL, `totalMints` INTEGER NOT NULL, `totalTrades` INTEGER NOT NULL, `isSecured` INTEGER NOT NULL, `securedDob` TEXT NOT NULL, `securedFirst` TEXT NOT NULL, `securedLast` TEXT NOT NULL, `seedPhrase` TEXT NOT NULL, `pinCode` TEXT NOT NULL, `pinSafeMode` TEXT, `pinPanicMode` TEXT, `systemLanguage` TEXT NOT NULL, `proxyType` TEXT NOT NULL, `proxyHost` TEXT NOT NULL, `proxyPort` INTEGER NOT NULL, `proxyConfig` TEXT NOT NULL, `isProxyActive` INTEGER NOT NULL, `isCloudAllocated` INTEGER NOT NULL, `allocatedDiskSpaceGb` REAL NOT NULL, `nodeRating` REAL NOT NULL, `alias` TEXT NOT NULL, `avatarIndex` INTEGER NOT NULL, `customAvatarUri` TEXT, `bio` TEXT NOT NULL, `balanceEth` REAL NOT NULL, `balanceTon` REAL NOT NULL, `balanceSol` REAL NOT NULL, `balanceTrx` REAL NOT NULL, `balanceUsdc` REAL NOT NULL, `lastWeedClaimTime` INTEGER NOT NULL, `weedStreak` INTEGER NOT NULL, `isAdFreeSubscribed` INTEGER NOT NULL, `adFreeExpiryTime` INTEGER NOT NULL, `nodeStake` INTEGER NOT NULL, `nodeUptimeMinutes` INTEGER NOT NULL, `nodeBandwidthMbps` REAL NOT NULL, `nodeGlobalRank` INTEGER NOT NULL, `nodeLastActiveTime` INTEGER NOT NULL, `nodeIsOnline` INTEGER NOT NULL, `cloudRewardClaimed` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "username",
+            "columnName": "username",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weed",
+            "columnName": "weed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalDraws",
+            "columnName": "totalDraws",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalMints",
+            "columnName": "totalMints",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalTrades",
+            "columnName": "totalTrades",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSecured",
+            "columnName": "isSecured",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "securedDob",
+            "columnName": "securedDob",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "securedFirst",
+            "columnName": "securedFirst",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "securedLast",
+            "columnName": "securedLast",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seedPhrase",
+            "columnName": "seedPhrase",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pinCode",
+            "columnName": "pinCode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pinSafeMode",
+            "columnName": "pinSafeMode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pinPanicMode",
+            "columnName": "pinPanicMode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "systemLanguage",
+            "columnName": "systemLanguage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "proxyType",
+            "columnName": "proxyType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "proxyHost",
+            "columnName": "proxyHost",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "proxyPort",
+            "columnName": "proxyPort",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "proxyConfig",
+            "columnName": "proxyConfig",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isProxyActive",
+            "columnName": "isProxyActive",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isCloudAllocated",
+            "columnName": "isCloudAllocated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "allocatedDiskSpaceGb",
+            "columnName": "allocatedDiskSpaceGb",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeRating",
+            "columnName": "nodeRating",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alias",
+            "columnName": "alias",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "avatarIndex",
+            "columnName": "avatarIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "customAvatarUri",
+            "columnName": "customAvatarUri",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "bio",
+            "columnName": "bio",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "balanceEth",
+            "columnName": "balanceEth",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "balanceTon",
+            "columnName": "balanceTon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "balanceSol",
+            "columnName": "balanceSol",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "balanceTrx",
+            "columnName": "balanceTrx",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "balanceUsdc",
+            "columnName": "balanceUsdc",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastWeedClaimTime",
+            "columnName": "lastWeedClaimTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weedStreak",
+            "columnName": "weedStreak",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isAdFreeSubscribed",
+            "columnName": "isAdFreeSubscribed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "adFreeExpiryTime",
+            "columnName": "adFreeExpiryTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeStake",
+            "columnName": "nodeStake",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeUptimeMinutes",
+            "columnName": "nodeUptimeMinutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeBandwidthMbps",
+            "columnName": "nodeBandwidthMbps",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeGlobalRank",
+            "columnName": "nodeGlobalRank",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeLastActiveTime",
+            "columnName": "nodeLastActiveTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeIsOnline",
+            "columnName": "nodeIsOnline",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cloudRewardClaimed",
+            "columnName": "cloudRewardClaimed",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "minted_cards",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `cardIndex` INTEGER NOT NULL, `rarity` TEXT NOT NULL, `mintNumber` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL, `isListed` INTEGER NOT NULL, `listPrice` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cardIndex",
+            "columnName": "cardIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rarity",
+            "columnName": "rarity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mintNumber",
+            "columnName": "mintNumber",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isListed",
+            "columnName": "isListed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "listPrice",
+            "columnName": "listPrice",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "market_listings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `cardIndex` INTEGER NOT NULL, `rarity` TEXT NOT NULL, `mintNumber` INTEGER NOT NULL, `price` INTEGER NOT NULL, `sellerName` TEXT NOT NULL, `isBot` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cardIndex",
+            "columnName": "cardIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rarity",
+            "columnName": "rarity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mintNumber",
+            "columnName": "mintNumber",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "price",
+            "columnName": "price",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sellerName",
+            "columnName": "sellerName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isBot",
+            "columnName": "isBot",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "transaction_logs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `cardIndex` INTEGER NOT NULL, `rarity` TEXT NOT NULL, `price` INTEGER NOT NULL, `type` TEXT NOT NULL, `targetParty` TEXT NOT NULL, `timestamp` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cardIndex",
+            "columnName": "cardIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rarity",
+            "columnName": "rarity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "price",
+            "columnName": "price",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetParty",
+            "columnName": "targetParty",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "peer_contacts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `onionAddress` TEXT NOT NULL, `publicKey` TEXT NOT NULL, `status` TEXT NOT NULL, `timestamp` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "onionAddress",
+            "columnName": "onionAddress",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicKey",
+            "columnName": "publicKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "encrypted_messages",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `contactId` INTEGER NOT NULL, `senderName` TEXT NOT NULL, `ciphertext` TEXT NOT NULL, `iv` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `isIncoming` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "senderName",
+            "columnName": "senderName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ciphertext",
+            "columnName": "ciphertext",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iv",
+            "columnName": "iv",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isIncoming",
+            "columnName": "isIncoming",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "p2p_transactions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `blockNumber` INTEGER NOT NULL, `previousHash` TEXT NOT NULL, `blockHash` TEXT NOT NULL, `nonce` INTEGER NOT NULL, `senderAddress` TEXT NOT NULL, `recipientAddress` TEXT NOT NULL, `amountWeed` INTEGER NOT NULL, `cardIndex` INTEGER NOT NULL, `mintNumber` INTEGER NOT NULL, `signature` TEXT NOT NULL, `timestamp` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "blockNumber",
+            "columnName": "blockNumber",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "previousHash",
+            "columnName": "previousHash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "blockHash",
+            "columnName": "blockHash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nonce",
+            "columnName": "nonce",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "senderAddress",
+            "columnName": "senderAddress",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recipientAddress",
+            "columnName": "recipientAddress",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "amountWeed",
+            "columnName": "amountWeed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cardIndex",
+            "columnName": "cardIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mintNumber",
+            "columnName": "mintNumber",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "signature",
+            "columnName": "signature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "ad_banners",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `content` TEXT NOT NULL, `theme` TEXT NOT NULL, `authorName` TEXT NOT NULL, `authorContactOnion` TEXT NOT NULL, `colorHex` TEXT NOT NULL, `imageUrl` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `costPaid` INTEGER NOT NULL, `clicks` INTEGER NOT NULL, `messagePriceWeed` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "theme",
+            "columnName": "theme",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "authorName",
+            "columnName": "authorName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "authorContactOnion",
+            "columnName": "authorContactOnion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "colorHex",
+            "columnName": "colorHex",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "imageUrl",
+            "columnName": "imageUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "costPaid",
+            "columnName": "costPaid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clicks",
+            "columnName": "clicks",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messagePriceWeed",
+            "columnName": "messagePriceWeed",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "divination_spreads",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `question` TEXT NOT NULL, `cardIndicesString` TEXT NOT NULL, `isUprightString` TEXT NOT NULL, `report` TEXT NOT NULL, `timestamp` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "question",
+            "columnName": "question",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cardIndicesString",
+            "columnName": "cardIndicesString",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isUprightString",
+            "columnName": "isUprightString",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "report",
+            "columnName": "report",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "localization_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `en` TEXT NOT NULL, `ru` TEXT NOT NULL, `es` TEXT NOT NULL, `he` TEXT NOT NULL, `de` TEXT NOT NULL, `fr` TEXT NOT NULL, `pt` TEXT NOT NULL, `it` TEXT NOT NULL, `zh` TEXT NOT NULL, `ja` TEXT NOT NULL, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "en",
+            "columnName": "en",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ru",
+            "columnName": "ru",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "es",
+            "columnName": "es",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "he",
+            "columnName": "he",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "de",
+            "columnName": "de",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fr",
+            "columnName": "fr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pt",
+            "columnName": "pt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "it",
+            "columnName": "it",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "zh",
+            "columnName": "zh",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ja",
+            "columnName": "ja",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        }
+      },
+      {
+        "tableName": "card_localization_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`cardIndex` INTEGER NOT NULL, `nameEn` TEXT NOT NULL, `nameRu` TEXT NOT NULL, `nameEs` TEXT NOT NULL, `nameHe` TEXT NOT NULL, `nameDe` TEXT NOT NULL, `nameFr` TEXT NOT NULL, `namePt` TEXT NOT NULL, `nameIt` TEXT NOT NULL, `nameZh` TEXT NOT NULL, `nameJa` TEXT NOT NULL, `traditionalNameEn` TEXT NOT NULL, `traditionalNameRu` TEXT NOT NULL, `traditionalNameEs` TEXT NOT NULL, `traditionalNameHe` TEXT NOT NULL, `traditionalNameDe` TEXT NOT NULL, `traditionalNameFr` TEXT NOT NULL, `traditionalNamePt` TEXT NOT NULL, `traditionalNameIt` TEXT NOT NULL, `traditionalNameZh` TEXT NOT NULL, `traditionalNameJa` TEXT NOT NULL, `descriptionEn` TEXT NOT NULL, `descriptionRu` TEXT NOT NULL, `descriptionEs` TEXT NOT NULL, `descriptionHe` TEXT NOT NULL, `descriptionDe` TEXT NOT NULL, `descriptionFr` TEXT NOT NULL, `descriptionPt` TEXT NOT NULL, `descriptionIt` TEXT NOT NULL, `descriptionZh` TEXT NOT NULL, `descriptionJa` TEXT NOT NULL, `circuitryElementEn` TEXT NOT NULL, `circuitryElementRu` TEXT NOT NULL, `circuitryElementEs` TEXT NOT NULL, `circuitryElementHe` TEXT NOT NULL, `circuitryElementDe` TEXT NOT NULL, `circuitryElementFr` TEXT NOT NULL, `circuitryElementPt` TEXT NOT NULL, `circuitryElementIt` TEXT NOT NULL, `circuitryElementZh` TEXT NOT NULL, `circuitryElementJa` TEXT NOT NULL, `cyberMeaningEn` TEXT NOT NULL, `cyberMeaningRu` TEXT NOT NULL, `cyberMeaningEs` TEXT NOT NULL, `cyberMeaningHe` TEXT NOT NULL, `cyberMeaningDe` TEXT NOT NULL, `cyberMeaningFr` TEXT NOT NULL, `cyberMeaningPt` TEXT NOT NULL, `cyberMeaningIt` TEXT NOT NULL, `cyberMeaningZh` TEXT NOT NULL, `cyberMeaningJa` TEXT NOT NULL, `uprightAdviceEn` TEXT NOT NULL, `uprightAdviceRu` TEXT NOT NULL, `uprightAdviceEs` TEXT NOT NULL, `uprightAdviceHe` TEXT NOT NULL, `uprightAdviceDe` TEXT NOT NULL, `uprightAdviceFr` TEXT NOT NULL, `uprightAdvicePt` TEXT NOT NULL, `uprightAdviceIt` TEXT NOT NULL, `uprightAdviceZh` TEXT NOT NULL, `uprightAdviceJa` TEXT NOT NULL, `reversedAdviceEn` TEXT NOT NULL, `reversedAdviceRu` TEXT NOT NULL, `reversedAdviceEs` TEXT NOT NULL, `reversedAdviceHe` TEXT NOT NULL, `reversedAdviceDe` TEXT NOT NULL, `reversedAdviceFr` TEXT NOT NULL, `reversedAdvicePt` TEXT NOT NULL, `reversedAdviceIt` TEXT NOT NULL, `reversedAdviceZh` TEXT NOT NULL, `reversedAdviceJa` TEXT NOT NULL, PRIMARY KEY(`cardIndex`))",
+        "fields": [
+          {
+            "fieldPath": "cardIndex",
+            "columnName": "cardIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEn",
+            "columnName": "nameEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameRu",
+            "columnName": "nameRu",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEs",
+            "columnName": "nameEs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameHe",
+            "columnName": "nameHe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameDe",
+            "columnName": "nameDe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameFr",
+            "columnName": "nameFr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namePt",
+            "columnName": "namePt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameIt",
+            "columnName": "nameIt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameZh",
+            "columnName": "nameZh",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameJa",
+            "columnName": "nameJa",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "traditionalNameEn",
+            "columnName": "traditionalNameEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "traditionalNameRu",
+            "columnName": "traditionalNameRu",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "traditionalNameEs",
+            "columnName": "traditionalNameEs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "traditionalNameHe",
+            "columnName": "traditionalNameHe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "traditionalNameDe",
+            "columnName": "traditionalNameDe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "traditionalNameFr",
+            "columnName": "traditionalNameFr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "traditionalNamePt",
+            "columnName": "traditionalNamePt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "traditionalNameIt",
+            "columnName": "traditionalNameIt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "traditionalNameZh",
+            "columnName": "traditionalNameZh",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "traditionalNameJa",
+            "columnName": "traditionalNameJa",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descriptionEn",
+            "columnName": "descriptionEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descriptionRu",
+            "columnName": "descriptionRu",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descriptionEs",
+            "columnName": "descriptionEs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descriptionHe",
+            "columnName": "descriptionHe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descriptionDe",
+            "columnName": "descriptionDe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descriptionFr",
+            "columnName": "descriptionFr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descriptionPt",
+            "columnName": "descriptionPt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descriptionIt",
+            "columnName": "descriptionIt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descriptionZh",
+            "columnName": "descriptionZh",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descriptionJa",
+            "columnName": "descriptionJa",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "circuitryElementEn",
+            "columnName": "circuitryElementEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "circuitryElementRu",
+            "columnName": "circuitryElementRu",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "circuitryElementEs",
+            "columnName": "circuitryElementEs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "circuitryElementHe",
+            "columnName": "circuitryElementHe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "circuitryElementDe",
+            "columnName": "circuitryElementDe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "circuitryElementFr",
+            "columnName": "circuitryElementFr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "circuitryElementPt",
+            "columnName": "circuitryElementPt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "circuitryElementIt",
+            "columnName": "circuitryElementIt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "circuitryElementZh",
+            "columnName": "circuitryElementZh",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "circuitryElementJa",
+            "columnName": "circuitryElementJa",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cyberMeaningEn",
+            "columnName": "cyberMeaningEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cyberMeaningRu",
+            "columnName": "cyberMeaningRu",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cyberMeaningEs",
+            "columnName": "cyberMeaningEs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cyberMeaningHe",
+            "columnName": "cyberMeaningHe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cyberMeaningDe",
+            "columnName": "cyberMeaningDe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cyberMeaningFr",
+            "columnName": "cyberMeaningFr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cyberMeaningPt",
+            "columnName": "cyberMeaningPt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cyberMeaningIt",
+            "columnName": "cyberMeaningIt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cyberMeaningZh",
+            "columnName": "cyberMeaningZh",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cyberMeaningJa",
+            "columnName": "cyberMeaningJa",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uprightAdviceEn",
+            "columnName": "uprightAdviceEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uprightAdviceRu",
+            "columnName": "uprightAdviceRu",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uprightAdviceEs",
+            "columnName": "uprightAdviceEs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uprightAdviceHe",
+            "columnName": "uprightAdviceHe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uprightAdviceDe",
+            "columnName": "uprightAdviceDe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uprightAdviceFr",
+            "columnName": "uprightAdviceFr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uprightAdvicePt",
+            "columnName": "uprightAdvicePt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uprightAdviceIt",
+            "columnName": "uprightAdviceIt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uprightAdviceZh",
+            "columnName": "uprightAdviceZh",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uprightAdviceJa",
+            "columnName": "uprightAdviceJa",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reversedAdviceEn",
+            "columnName": "reversedAdviceEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reversedAdviceRu",
+            "columnName": "reversedAdviceRu",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reversedAdviceEs",
+            "columnName": "reversedAdviceEs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reversedAdviceHe",
+            "columnName": "reversedAdviceHe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reversedAdviceDe",
+            "columnName": "reversedAdviceDe",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reversedAdviceFr",
+            "columnName": "reversedAdviceFr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reversedAdvicePt",
+            "columnName": "reversedAdvicePt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reversedAdviceIt",
+            "columnName": "reversedAdviceIt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reversedAdviceZh",
+            "columnName": "reversedAdviceZh",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reversedAdviceJa",
+            "columnName": "reversedAdviceJa",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "cardIndex"
+          ]
+        }
+      },
+      {
+        "tableName": "saved_decks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `icon` TEXT NOT NULL, `cardIndicesString` TEXT NOT NULL, `isActive` INTEGER NOT NULL, `description` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "icon",
+            "columnName": "icon",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cardIndicesString",
+            "columnName": "cardIndicesString",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isActive",
+            "columnName": "isActive",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "card_upgrades",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`cardIndex` INTEGER NOT NULL, `upgradeLevel` INTEGER NOT NULL, `bonusPower` INTEGER NOT NULL, `bonusDefense` INTEGER NOT NULL, `energyDiscount` INTEGER NOT NULL, `customSkin` TEXT NOT NULL, PRIMARY KEY(`cardIndex`))",
+        "fields": [
+          {
+            "fieldPath": "cardIndex",
+            "columnName": "cardIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "upgradeLevel",
+            "columnName": "upgradeLevel",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bonusPower",
+            "columnName": "bonusPower",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bonusDefense",
+            "columnName": "bonusDefense",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "energyDiscount",
+            "columnName": "energyDiscount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "customSkin",
+            "columnName": "customSkin",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "cardIndex"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '28b0574032eb76d2f37b3b580ba31f46')"
+    ]
+  }
+}

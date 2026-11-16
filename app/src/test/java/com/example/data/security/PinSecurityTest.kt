@@ -4,11 +4,16 @@ import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.TarotRepository
 import com.example.data.UserProfile
+import com.example.data.crypto.CryptoHelper
+import com.example.data.crypto.SecureVaultHelper
 import com.example.viewmodel.TarotViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -29,6 +34,7 @@ class PinSecurityTest {
     @Before
     fun setup() {
         app = ApplicationProvider.getApplicationContext()
+        SecureVaultHelper.resetPinLockout(app)
         repository = TarotRepository.getInstance(app)
         viewModel = TarotViewModel(app)
     }
@@ -43,7 +49,9 @@ class PinSecurityTest {
     }
 
     @Test
-    fun panicPin_doesNotWipeDatabase_andFailsUnlock() = runTest {
+    fun panicPin_doesNotWipeDatabase_andFailsUnlock() = runBlocking {
+        repository.userProfile.first { it != null }
+
         // Save a secured profile with PIN 87654321
         repository.saveSecuredProfile(
             dob = "1990-01-01",
@@ -53,10 +61,17 @@ class PinSecurityTest {
             pin = "87654321"
         )
 
-        // Give state flow a moment to emit
         val profile = repository.getUserProfileSync()
-        assertEquals("87654321", profile?.pinCode)
-        assertNull(profile?.pinPanicMode)
+        assertNotNull(profile)
+        assertNotEquals("PIN must not be stored in plaintext", "87654321", profile!!.pinCode)
+        assertTrue("PIN must be stored as PBKDF2_V1 hash", CryptoHelper.isPinHashed(profile.pinCode))
+        assertTrue("PBKDF2 PIN verification must succeed for valid PIN", CryptoHelper.verifyPin("87654321", profile.pinCode))
+        assertTrue("Seed phrase must be Keystore-sealed", SecureVaultHelper.isEncrypted(profile.seedPhrase))
+        assertEquals("test seed phrase not real entropy", repository.getDecryptedSeedPhrase())
+        assertEquals("PII DOB must be scrubbed", "", profile.securedDob)
+        assertEquals("PII First Name must be scrubbed", "", profile.securedFirst)
+        assertEquals("PII Last Name must be scrubbed", "", profile.securedLast)
+        assertNull(profile.pinPanicMode)
 
         // Attempt to enter old backdoor "22222222"
         val unlockResult = viewModel.unlockApp("22222222")
@@ -64,11 +79,15 @@ class PinSecurityTest {
 
         // Verify database is NOT wiped
         val profileAfter = repository.getUserProfileSync()
-        assertEquals("Profile must NOT be wiped by entering 22222222", "87654321", profileAfter?.pinCode)
+        assertEquals("Profile must NOT be wiped by entering 22222222", profile.pinCode, profileAfter?.pinCode)
+        assertEquals("test seed phrase not real entropy", repository.getDecryptedSeedPhrase())
     }
 
     @Test
-    fun rateLimiting_locksOutAfter5FailedAttempts() = runTest {
+    fun rateLimiting_locksOutAfter5FailedAttempts_andPersistsAcrossRestart() = runBlocking {
+        repository.userProfile.first { it != null }
+        SecureVaultHelper.resetPinLockout(app)
+
         repository.saveSecuredProfile(
             dob = "1990-01-01",
             first = "Bob",
@@ -84,7 +103,7 @@ class PinSecurityTest {
             assertEquals(i, viewModel.pinFailedAttempts.value)
         }
 
-        // 5th failed attempt should trigger lockout
+        // 5th failed attempt should trigger persistent lockout
         val fifthResult = viewModel.unlockApp("00000000")
         assertFalse(fifthResult)
         assertEquals(5, viewModel.pinFailedAttempts.value)
@@ -93,5 +112,12 @@ class PinSecurityTest {
         // Even with the correct PIN, during lockout access must be denied
         val attemptDuringLockout = viewModel.unlockApp("12345678")
         assertFalse("Must reject unlock attempts while rate-limited lockout is active", attemptDuringLockout)
+
+        // Recreate ViewModel (simulating app kill/restart) -> lockout must STILL hold (H4)
+        val freshViewModel = TarotViewModel(app)
+        assertEquals(5, freshViewModel.pinFailedAttempts.value)
+        assertTrue(freshViewModel.lockoutUntilMs.value > System.currentTimeMillis())
+        assertFalse("Lockout must survive app/ViewModel restart", freshViewModel.unlockApp("12345678"))
     }
 }
+

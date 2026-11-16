@@ -86,4 +86,31 @@ class Bip39Test {
         assertFalse("11 words must fail", Bip39Helper.validateWords(validMnemonic.take(11)))
         assertFalse("13 words must fail", Bip39Helper.validateWords(validMnemonic + "about"))
     }
+
+    @Test
+    fun bip39_mnemonicToSeed_matchesCanonicalPbkdf2Sha512Vectors() {
+        val mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".split(" ")
+
+        // Vector A: empty passphrase
+        val seedNoPass = Bip39Helper.mnemonicToSeed(mnemonic, "")
+        assertEquals(64, seedNoPass.size)
+        assertEquals(
+            "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+            seedNoPass.joinToString("") { "%02x".format(it) }
+        )
+
+        // Vector B: "TREZOR" passphrase
+        val seedTrezor = Bip39Helper.mnemonicToSeed(mnemonic, "TREZOR")
+        assertEquals(64, seedTrezor.size)
+        assertEquals(
+            "c55257c360c07c72029aebc1b53c05ed0362ada38ead3e3e9efa3708e53495531f09a6987599d18264c1e1c92f2cf141630c7a3c4ab7c81b2f001698e7463b04",
+            seedTrezor.joinToString("") { "%02x".format(it) }
+        )
+
+        // Random 256-bit CSPRNG mnemonic must pass strict checksum validation
+        val randomWords = Bip39Helper.generateMnemonic(Bip39Helper.generateRandomEntropy(256))
+        assertEquals(24, randomWords.size)
+        assertTrue(Bip39Helper.validateWords(randomWords))
+    }
 }
+

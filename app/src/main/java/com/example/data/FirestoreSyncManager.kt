@@ -16,11 +16,13 @@ import kotlinx.coroutines.tasks.await
 
 private const val TAG = "FirestoreSyncManager"
 
-class FirestoreSyncManager(private val context: Context) {
+class FirestoreSyncManager private constructor(context: Context) {
+
+    private val appContext = context.applicationContext
 
     // Resolves mandatory custom named database ID from res/values/firebase_applet_config.xml
     private val firestore: FirebaseFirestore by lazy {
-        val databaseId = context.getString(R.string.firestore_database_id)
+        val databaseId = appContext.getString(R.string.firestore_database_id)
         FirebaseFirestore.getInstance(databaseId)
     }
 
@@ -50,7 +52,7 @@ class FirestoreSyncManager(private val context: Context) {
                 .set(data, SetOptions.merge())
                 .await()
 
-            Log.d(TAG, "User profile successfully synced to Firestore for user: $uid")
+            Log.d(TAG, "User profile synced to Firestore")
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sync user profile to Firestore: ${e.message}", e)
@@ -85,7 +87,7 @@ class FirestoreSyncManager(private val context: Context) {
             )
 
             readingRef.set(data).await()
-            Log.d(TAG, "Tarot reading saved to cloud with ID: ${readingRef.id}")
+            Log.d(TAG, "Tarot reading saved to cloud")
             Result.success(readingRef.id)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save reading to cloud: ${e.message}", e)
@@ -113,6 +115,7 @@ class FirestoreSyncManager(private val context: Context) {
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
                         Log.e(TAG, "Error listening to cloud readings: ${error.message}", error)
+                        close(error)
                         return@addSnapshotListener
                     }
                     if (snapshot != null) {
@@ -122,6 +125,7 @@ class FirestoreSyncManager(private val context: Context) {
                 }
         } catch (e: Exception) {
             Log.e(TAG, "Exception attaching snapshot listener: ${e.message}", e)
+            close(e)
         }
 
         awaitClose {

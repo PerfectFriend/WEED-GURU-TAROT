@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
 import com.example.data.crypto.CryptoHelper
+import com.example.data.crypto.SecureVaultHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -16,8 +18,12 @@ import java.net.Socket
 import java.net.InetSocketAddress
 import java.net.Proxy
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import com.example.ui.theme.CyberSkin
+import com.example.widget.TarotAppWidgetProvider
+import kotlinx.coroutines.Job
 
 sealed interface DivinationState {
     object Idle : DivinationState
@@ -49,6 +55,55 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
         CyberSkin.fromId(sharedPrefs.getString("selected_skin", "jamaica") ?: "jamaica")
     )
     val currentSkin: StateFlow<CyberSkin> = _currentSkin.asStateFlow()
+
+    private val firebaseAuthManager: FirebaseAuthManager? by lazy {
+        runCatching { FirebaseAuthManager.getInstance(getApplication()) }.getOrNull()
+    }
+    private val firestoreSyncManager: FirestoreSyncManager? by lazy {
+        runCatching { FirestoreSyncManager.getInstance(getApplication()) }.getOrNull()
+    }
+
+    private val _cloudUserEmail = MutableStateFlow<String?>(null)
+    val cloudUserEmail: StateFlow<String?> = _cloudUserEmail.asStateFlow()
+
+    private val _cloudUserName = MutableStateFlow<String?>(null)
+    val cloudUserName: StateFlow<String?> = _cloudUserName.asStateFlow()
+
+    private val _isCloudSigningIn = MutableStateFlow(false)
+    val isCloudSigningIn: StateFlow<Boolean> = _isCloudSigningIn.asStateFlow()
+
+    private val _cloudReadingsCount = MutableStateFlow(0)
+    val cloudReadingsCount: StateFlow<Int> = _cloudReadingsCount.asStateFlow()
+
+    private val _cloudSyncStatus = MutableStateFlow<String?>(null)
+    val cloudSyncStatus: StateFlow<String?> = _cloudSyncStatus.asStateFlow()
+
+    private var cloudReadingsJob: Job? = null
+
+    init {
+        runCatching {
+            val auth = firebaseAuthManager
+            if (auth != null) {
+                viewModelScope.launch {
+                    auth.currentUser.collect { user ->
+                        _cloudUserEmail.value = user?.email
+                        _cloudUserName.value = user?.displayName
+                        if (user != null) {
+                            attachCloudReadingsObserver()
+                        } else {
+                            cloudReadingsJob?.cancel()
+                            _cloudReadingsCount.value = 0
+                        }
+                    }
+                }
+                viewModelScope.launch {
+                    auth.isSigningIn.collect { signingIn ->
+                        _isCloudSigningIn.value = signingIn
+                    }
+                }
+            }
+        }
+    }
 
     fun updateSkin(skin: CyberSkin) {
         sharedPrefs.edit().putString("selected_skin", skin.id).apply()
@@ -316,19 +371,19 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
                         "WEED" to weedVar
                     )
 
-                    sums["BTC"] = sums["BTC"]!! + btcVar
-                    sums["ETH"] = sums["ETH"]!! + ethVar
-                    sums["SOL"] = sums["SOL"]!! + solVar
-                    sums["WEED"] = sums["WEED"]!! + weedVar
+                    sums["BTC"] = (sums["BTC"] ?: 0.0) + btcVar
+                    sums["ETH"] = (sums["ETH"] ?: 0.0) + ethVar
+                    sums["SOL"] = (sums["SOL"] ?: 0.0) + solVar
+                    sums["WEED"] = (sums["WEED"] ?: 0.0) + weedVar
                 }
 
                 _topExchangesTickers.value = newTickers
 
                 // Compute exact averages
-                val avgBtc = sums["BTC"]!! / exchangesList.size
-                val avgEth = sums["ETH"]!! / exchangesList.size
-                val avgSol = sums["SOL"]!! / exchangesList.size
-                val avgWeed = sums["WEED"]!! / exchangesList.size
+                val avgBtc = (sums["BTC"] ?: 0.0) / exchangesList.size
+                val avgEth = (sums["ETH"] ?: 0.0) / exchangesList.size
+                val avgSol = (sums["SOL"] ?: 0.0) / exchangesList.size
+                val avgWeed = (sums["WEED"] ?: 0.0) / exchangesList.size
 
                 _compiledAverageRates.value = mapOf(
                     "BTC" to avgBtc,
@@ -706,15 +761,29 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun saveSecuredProfileWithPin(dob: String, first: String, last: String, pin: String, pinSafe: String = "11111111", pinPanic: String = "22222222", aliasVal: String = "", avatarIdx: Int = 0, customWords: List<String>? = null) {
+    fun saveSecuredProfileWithPin(
+        dob: String,
+        first: String,
+        last: String,
+        pin: String,
+        pinSafe: String? = null,
+        pinPanic: String? = null,
+        aliasVal: String = "",
+        avatarIdx: Int = 0,
+        customWords: List<String>? = null
+    ) {
         if (pin.length != 8 || !pin.all { it.isDigit() }) {
             _uiNotification.value = "⚠️ PIN must be exactly 8 digits."
             return
         }
-        val words = customWords ?: _generatedMnemonic.value ?: listOf("weed", "guru", "botany", "decentralized", "cloud", "security", "node", "tor", "onion", "bip39", "encryption", "wallet")
+        val words = customWords ?: _generatedMnemonic.value ?: Bip39Helper.generateMnemonic(
+            Bip39Helper.generateRandomEntropy(256)
+        )
         viewModelScope.launch {
             val seedString = words.joinToString(" ")
-            repository.saveSecuredProfile(dob, first, last, seedString, pin, pinSafe, pinPanic, aliasVal, avatarIdx)
+            repository.saveSecuredProfile(dob, first, last, seedString, pin, pinSafe, null, aliasVal, avatarIdx)
+            _pinFailedAttempts.value = 0
+            _lockoutUntilMs.value = 0L
             _isUnlockedThisSession.value = true // automatically unlock
             _isSafeBotanicalMode.value = false
             _securityRegistrationStep.value = 0 // reset wizard
@@ -723,32 +792,57 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private val _pinFailedAttempts = MutableStateFlow(0)
+    private val initialPinLockout = SecureVaultHelper.getPinLockoutState(application)
+
+    private val _pinFailedAttempts = MutableStateFlow(initialPinLockout.failedAttempts)
     val pinFailedAttempts: StateFlow<Int> = _pinFailedAttempts.asStateFlow()
 
-    private val _lockoutUntilMs = MutableStateFlow(0L)
+    private val _lockoutUntilMs = MutableStateFlow(
+        if (initialPinLockout.lockoutRemainingMs > 0L) System.currentTimeMillis() + initialPinLockout.lockoutRemainingMs else 0L
+    )
     val lockoutUntilMs: StateFlow<Long> = _lockoutUntilMs.asStateFlow()
 
     fun triggerPanicReset() {
         viewModelScope.launch {
             repository.triggerPanicResetComplete()
+            _pinFailedAttempts.value = 0
+            _lockoutUntilMs.value = 0L
             _isUnlockedThisSession.value = false
             _isSafeBotanicalMode.value = false
             _uiNotification.value = "🚨 EMERGENCY PANIC WIPE COMPLETED. DATABASE SCRUBBED."
         }
     }
 
-    fun unlockApp(pin: String): Boolean {
-        val now = System.currentTimeMillis()
-        if (now < _lockoutUntilMs.value) {
-            val secondsLeft = ((_lockoutUntilMs.value - now) / 1000) + 1
+    suspend fun verifyPrimaryPin(pin: String): Boolean {
+        return repository.verifyPrimaryPin(pin)
+    }
+
+    suspend fun getDecryptedSeedPhrase(): String {
+        return repository.getDecryptedSeedPhrase()
+    }
+
+    fun decryptProxyConfig(stored: String): String {
+        return repository.decryptProxyConfig(stored)
+    }
+
+    fun getDevicePublicKeyBase64(): String {
+        return repository.getDevicePublicKeyBase64()
+    }
+
+    suspend fun unlockApp(pin: String): Boolean {
+        val appCtx = getApplication<Application>()
+        val lockoutState = withContext(Dispatchers.IO) { SecureVaultHelper.getPinLockoutState(appCtx) }
+        if (lockoutState.lockoutRemainingMs > 0L) {
+            val secondsLeft = (lockoutState.lockoutRemainingMs / 1000L) + 1L
+            _pinFailedAttempts.value = lockoutState.failedAttempts
+            _lockoutUntilMs.value = System.currentTimeMillis() + lockoutState.lockoutRemainingMs
             _uiNotification.value = "⛔ ACCESS TEMPORARILY LOCKED: Wait ${secondsLeft}s before retrying."
             return false
         }
 
-        val profile = userProfile.value ?: runCatching {
-            kotlinx.coroutines.runBlocking(Dispatchers.IO) { repository.getUserProfileSync() }
-        }.getOrNull() ?: return false
+        val profile = userProfile.value ?: withContext(Dispatchers.IO) {
+            repository.getUserProfileSync()
+        } ?: return false
 
         // If profile has no PIN configured
         if (profile.pinCode.isBlank()) {
@@ -757,34 +851,38 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
             return true
         }
 
-        // Constant-time comparison for primary PIN
-        if (CryptoHelper.constantTimeEquals(pin, profile.pinCode)) {
+        // Constant-time PBKDF2 verification for primary PIN
+        if (repository.verifyPrimaryPin(pin)) {
+            withContext(Dispatchers.IO) { SecureVaultHelper.resetPinLockout(appCtx) }
             _pinFailedAttempts.value = 0
+            _lockoutUntilMs.value = 0L
             _isUnlockedThisSession.value = true
             _isSafeBotanicalMode.value = false
             _uiNotification.value = "🔓 Decryption keys unlocked. Welcome back, ${profile.alias}."
             return true
         }
 
-        // Constant-time comparison for optional safe decoy PIN
-        val safePin = profile.pinSafeMode
-        if (!safePin.isNullOrBlank() && CryptoHelper.constantTimeEquals(pin, safePin)) {
+        // Constant-time PBKDF2 verification for optional safe decoy PIN
+        if (repository.verifySafePin(pin)) {
+            withContext(Dispatchers.IO) { SecureVaultHelper.resetPinLockout(appCtx) }
             _pinFailedAttempts.value = 0
+            _lockoutUntilMs.value = 0L
             _isUnlockedThisSession.value = true
             _isSafeBotanicalMode.value = true
             _uiNotification.value = "🛡️ Harmless Mode unlocked. Safe environment loaded."
             return true
         }
 
-        // PANIC BACKDOOR ELIMINATED: Entering a PIN never triggers database wipe.
-        val currentAttempts = _pinFailedAttempts.value + 1
-        _pinFailedAttempts.value = currentAttempts
+        // Persistent monotonic rate-limiting + exponential backoff (H4)
+        val updatedLockout = withContext(Dispatchers.IO) { SecureVaultHelper.recordFailedPinAttempt(appCtx) }
+        _pinFailedAttempts.value = updatedLockout.failedAttempts
 
-        if (currentAttempts >= 5) {
-            _lockoutUntilMs.value = now + 30_000L // 30 seconds rate-limit lockout
-            _uiNotification.value = "⛔ MAXIMUM ATTEMPTS EXCEEDED: Terminal locked for 30 seconds."
+        if (updatedLockout.lockoutRemainingMs > 0L) {
+            val secondsLocked = (updatedLockout.lockoutRemainingMs / 1000L).coerceAtLeast(1L)
+            _lockoutUntilMs.value = System.currentTimeMillis() + updatedLockout.lockoutRemainingMs
+            _uiNotification.value = "⛔ MAXIMUM ATTEMPTS EXCEEDED: Terminal locked for ${secondsLocked}s."
         } else {
-            val remaining = 5 - currentAttempts
+            val remaining = (5 - updatedLockout.failedAttempts).coerceAtLeast(1)
             _uiNotification.value = "❌ INVALID SECURITY PIN CODE ($remaining attempts remaining). ATTEMPT LOGGED."
         }
 
@@ -832,8 +930,17 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateSystemLanguage(lang: String) {
+        sharedPrefs.edit().putString("system_language", lang).apply()
         viewModelScope.launch {
             repository.updateSystemLanguage(lang)
+            runCatching {
+                val appCtx = getApplication<Application>()
+                val mgr = AppWidgetManager.getInstance(appCtx)
+                val ids = mgr.getAppWidgetIds(ComponentName(appCtx, TarotAppWidgetProvider::class.java))
+                ids.forEach { widgetId ->
+                    TarotAppWidgetProvider.updateAppWidget(appCtx, mgr, widgetId)
+                }
+            }
             _uiNotification.value = "🌐 Interface localization dialect updated to: $lang."
         }
     }
@@ -868,9 +975,13 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateCloudAllocation(allocated: Boolean, spaceGb: Float) {
         viewModelScope.launch {
-            repository.updateCloudAllocation(allocated, spaceGb)
+            val bonusGranted = repository.updateCloudAllocation(allocated, spaceGb)
             if (allocated) {
-                _uiNotification.value = "⚡ Disk space allocated! Your node is now online. +100 WEED awarded."
+                _uiNotification.value = if (bonusGranted) {
+                    "⚡ Disk space allocated! Local container is online. +100 WEED first-time bonus awarded."
+                } else {
+                    "⚡ Local storage allocation updated (${String.format("%.2f", spaceGb)} GB)."
+                }
             } else {
                 _uiNotification.value = "🔌 Local node taken offline. Disk space reclaimed."
             }
@@ -946,10 +1057,9 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
     // Address Book methods
     fun addContact(name: String, onionAddress: String) {
         viewModelScope.launch {
-            val fakePublicKey = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA" + 
-                repository.sha256(name + System.currentTimeMillis()).take(32) + "..."
-            repository.addPeerContact(name, onionAddress, fakePublicKey)
-            _uiNotification.value = "👤 Added peer contact: $name"
+            val unverifiedKey = "LOCAL_PEER_ID:" + repository.sha256(name + System.currentTimeMillis()).take(24)
+            repository.addPeerContact(name, onionAddress, unverifiedKey)
+            _uiNotification.value = "👤 Added sandbox/local peer contact: $name"
         }
     }
 
@@ -1002,10 +1112,10 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
             _miningProgress.value = null
             if (success) {
                 _p2pStatus.value = "SUCCESS"
-                _uiNotification.value = "⛓️ Block mined & broadcasted! Hash: ${hashOrError.take(12)}..."
+                _uiNotification.value = "🧪 [SANDBOX] Local ledger block signed (ECDSA P-256). Hash: ${hashOrError.take(12)}..."
             } else {
                 _p2pStatus.value = "FAILED"
-                _uiNotification.value = "❌ P2P Broadcast Failed: $hashOrError"
+                _uiNotification.value = "❌ Sandbox P2P Simulation Rejected: $hashOrError"
             }
         }
     }
@@ -1068,9 +1178,11 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
                 val logs = _smartContractLog.value.toMutableList()
                 logs.add("CONTRACT: Connection established. Network: ${details.networkName}. gasPrice: %.2f Gwei".format(gas))
                 _smartContractLog.value = logs
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 val logs = _smartContractLog.value.toMutableList()
-                logs.add("CONTRACT ERROR: Connection failed. Fallback simulation active.")
+                logs.add("CONTRACT ERROR: Connection failed (${e.message ?: "offline"}). Sandbox mode available.")
                 _smartContractLog.value = logs
             }
         }
@@ -1086,12 +1198,11 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _smartContractStatus.value = "MINTING"
             val logs = _smartContractLog.value.toMutableList()
-            logs.add("TX: Initiating mint transaction of Tarot module NFT #${mintNumber} (${rarity}) to $walletAddress...")
-            logs.add("TX: Generating ABI-encoded call: mintTarotNFT(address,uint256,string)...")
+            logs.add("TX: Preparing NFT metadata #${mintNumber} (${rarity}) for $walletAddress...")
             _smartContractLog.value = logs
 
-            delay(1500) // Realistic RPC handshake block time
-            
+            delay(800)
+
             val card = com.example.data.CyberTarotDeck.getCard(cardIndex)
             val metadata = com.example.data.TarotNftMetadata(
                 cardIndex = cardIndex,
@@ -1112,15 +1223,22 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
             if (result.success) {
                 _smartContractStatus.value = "SUCCESS"
                 _onChainMints.value = _onChainMints.value + result
-                updatedLogs.add("TX CONFIRMED: Block #${result.blockNumber} successfully mined!")
-                updatedLogs.add("TX HASH: ${result.txHash}")
-                updatedLogs.add("TOKEN ID: #${result.tokenId} successfully allocated to address.")
-                updatedLogs.add("METADATA URI: ${result.tokenUri}")
-                _uiNotification.value = "🚀 On-chain NFT successfully minted! Token: #${result.tokenId}"
+                if (result.isSimulated) {
+                    updatedLogs.add("🧪 SANDBOX RECEIPT: Simulated local mint #${result.tokenId} recorded (no mainnet tx broadcast).")
+                    updatedLogs.add("LOCAL HASH: ${result.txHash}")
+                    updatedLogs.add("METADATA URI: ${result.tokenUri}")
+                    _uiNotification.value = "🧪 [SANDBOX] Local simulated NFT receipt #${result.tokenId} created"
+                } else {
+                    updatedLogs.add("TX CONFIRMED: Block #${result.blockNumber} successfully mined!")
+                    updatedLogs.add("TX HASH: ${result.txHash}")
+                    updatedLogs.add("TOKEN ID: #${result.tokenId} successfully allocated to address.")
+                    updatedLogs.add("METADATA URI: ${result.tokenUri}")
+                    _uiNotification.value = "🚀 On-chain NFT successfully minted! Token: #${result.tokenId}"
+                }
             } else {
                 _smartContractStatus.value = "FAILED"
-                updatedLogs.add("TX FAILED: ${result.errorMessage ?: "Unknown smart contract error"}")
-                _uiNotification.value = "❌ Smart contract mint failed!"
+                updatedLogs.add("TX FAILED: ${result.errorMessage ?: "No hardware signer / wallet configured for live broadcast"}")
+                _uiNotification.value = "❌ Mint requires live EVM signer or blank RPC for Sandbox mode"
             }
             _smartContractLog.value = updatedLogs
         }
@@ -1674,24 +1792,20 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
 
     fun fetchSwarmShardBlockFromPeer(peerIp: String, index: Int, onComplete: (String?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            val bytes = swarmManager.fetchShardFromPeer(peerIp, index)
-            if (bytes != null) {
-                val text = String(bytes, Charsets.UTF_8)
-                postNotification("⚡ SWARM: TCP Streamed Shard #$index from peer $peerIp.")
-                
-                // If mounted, replicate it locally
-                if (swarmManager.containerMounted.value) {
-                    val localSuccess = swarmManager.writeShardBlock(index, bytes)
-                    if (localSuccess) {
-                        swarmManager.addLog("Replicated downloaded Shard #$index to local secure container.")
-                    }
+            val encryptedFrame = swarmManager.fetchShardFromPeer(peerIp, index)
+            if (encryptedFrame != null) {
+                val stored = swarmManager.writeEncryptedShardFrame(index, encryptedFrame)
+                val summary = if (stored) {
+                    "Encrypted shard #$index replica stored (${encryptedFrame.size} bytes, SHA-256 verified)"
+                } else {
+                    "Encrypted shard #$index received (${encryptedFrame.size} bytes, SHA-256 verified; allocate local container to persist)"
                 }
-                
+                postNotification("⚡ SWARM: $summary")
                 withContext(Dispatchers.Main) {
-                    onComplete(text)
+                    onComplete(summary)
                 }
             } else {
-                postNotification("❌ SWARM: Failed to stream shard #$index from peer $peerIp.")
+                postNotification("❌ SWARM: Failed to fetch authenticated encrypted shard #$index from peer $peerIp.")
                 withContext(Dispatchers.Main) {
                     onComplete(null)
                 }
@@ -1933,9 +2047,103 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
         _isSpeaking.value = false
     }
 
+    private fun attachCloudReadingsObserver() {
+        val sync = firestoreSyncManager ?: return
+        cloudReadingsJob?.cancel()
+        cloudReadingsJob = viewModelScope.launch {
+            sync.observeCloudReadings()
+                .catch { e ->
+                    _cloudSyncStatus.value = "Cloud observer paused: ${e.localizedMessage ?: "unavailable"}"
+                }
+                .collect { items ->
+                    _cloudReadingsCount.value = items.size
+                }
+        }
+    }
+
+    fun signInWithGoogle(activityContext: Context) {
+        val auth = firebaseAuthManager ?: run {
+            _cloudSyncStatus.value = "Firebase Auth unavailable in this build configuration."
+            return
+        }
+        viewModelScope.launch {
+            _cloudSyncStatus.value = "Connecting to Google Identity..."
+            val res = auth.signInWithGoogle(activityContext)
+            res.onSuccess { user ->
+                _cloudUserEmail.value = user.email
+                _cloudUserName.value = user.displayName
+                _cloudSyncStatus.value = "Authenticated as ${user.email ?: user.displayName ?: "Cloud User"}"
+                attachCloudReadingsObserver()
+                postNotification("☁️ Google Cloud Identity linked.")
+            }.onFailure { err ->
+                _cloudSyncStatus.value = err.localizedMessage ?: "Google Sign-In did not complete."
+                postNotification("☁️ Sign-In cancelled or unavailable: ${err.localizedMessage ?: "Retry on device"}")
+            }
+        }
+    }
+
+    fun signOutFromCloud(activityContext: Context) {
+        val auth = firebaseAuthManager ?: return
+        viewModelScope.launch {
+            cloudReadingsJob?.cancel()
+            auth.signOut(activityContext)
+            _cloudUserEmail.value = null
+            _cloudUserName.value = null
+            _cloudReadingsCount.value = 0
+            _cloudSyncStatus.value = "Signed out (Local Vault mode active)."
+            postNotification("☁️ Signed out of Cloud Sync.")
+        }
+    }
+
+    fun syncProfileToCloud() {
+        val sync = firestoreSyncManager ?: return
+        val profile = userProfile.value ?: return
+        viewModelScope.launch {
+            val res = sync.syncProfileToCloud(profile)
+            res.onSuccess {
+                _cloudSyncStatus.value = "Profile metadata synced to Firestore."
+                postNotification("☁️ Profile synced to Firestore.")
+            }.onFailure { err ->
+                _cloudSyncStatus.value = "Sync failed: ${err.localizedMessage}"
+                postNotification("❌ Cloud sync failed: ${err.localizedMessage}")
+            }
+        }
+    }
+
+    fun syncLatestReadingToCloud() {
+        val sync = firestoreSyncManager ?: return
+        val latest = divinationReadings.value.firstOrNull() ?: run {
+            _cloudSyncStatus.value = "No local tarot readings yet to upload."
+            return
+        }
+        viewModelScope.launch {
+            val indices = latest.cardIndicesString
+                .split(",")
+                .mapNotNull { it.trim().toIntOrNull() }
+            val uprights = latest.isUprightString
+                .split(",")
+                .mapNotNull { it.trim().toBooleanStrictOrNull() }
+            val res = sync.saveReadingToCloud(
+                question = latest.question,
+                cardIndices = indices,
+                isUpright = uprights,
+                report = latest.report
+            )
+            res.onSuccess { docId ->
+                _cloudSyncStatus.value = "Reading backed up ($docId)."
+                postNotification("☁️ Latest tarot reading synced to cloud.")
+            }.onFailure { err ->
+                _cloudSyncStatus.value = "Upload failed: ${err.localizedMessage}"
+                postNotification("❌ Reading backup failed: ${err.localizedMessage}")
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         tts?.shutdown()
+        swarmManager.shutdown()
+        cloudReadingsJob?.cancel()
     }
 }
 

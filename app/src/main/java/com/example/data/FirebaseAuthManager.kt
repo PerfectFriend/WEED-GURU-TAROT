@@ -8,6 +8,7 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.example.R
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -23,9 +24,9 @@ import kotlinx.coroutines.tasks.await
 
 private const val TAG = "FirebaseAuthManager"
 
-class FirebaseAuthManager(private val context: Context) {
+class FirebaseAuthManager private constructor(context: Context) {
+    private val appContext = context.applicationContext
     private val auth: FirebaseAuth = Firebase.auth
-    private val credentialManager = CredentialManager.create(context)
 
     private val _currentUser = MutableStateFlow<FirebaseUser?>(auth.currentUser)
     val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
@@ -46,13 +47,14 @@ class FirebaseAuthManager(private val context: Context) {
 
     /**
      * Interactive Google Sign-In using Credential Manager with GetSignInWithGoogleOption.
+     * Requires an Activity/UI Context so Credential Manager can display the account chooser sheet.
      */
-    suspend fun signInWithGoogle(): Result<FirebaseUser> {
+    suspend fun signInWithGoogle(activityContext: Context): Result<FirebaseUser> {
         _isSigningIn.value = true
         _authError.value = null
 
         return try {
-            val serverClientId = context.getString(R.string.default_web_client_id)
+            val serverClientId = appContext.getString(R.string.default_web_client_id)
             val signInOption = GetSignInWithGoogleOption.Builder(serverClientId)
                 .build()
 
@@ -60,9 +62,10 @@ class FirebaseAuthManager(private val context: Context) {
                 .addCredentialOption(signInOption)
                 .build()
 
-            val result = credentialManager.getCredential(
+            val uiCredentialManager = CredentialManager.create(activityContext)
+            val result = uiCredentialManager.getCredential(
                 request = request,
-                context = context
+                context = activityContext
             )
 
             val credential = result.credential
@@ -85,6 +88,12 @@ class FirebaseAuthManager(private val context: Context) {
             _isSigningIn.value = false
             Log.w(TAG, "Interactive Google sign-in was cancelled by user: ${e.message}")
             Result.failure(e)
+        } catch (e: NoCredentialException) {
+            _isSigningIn.value = false
+            val msg = "No Google account available on device for Credential Manager sign-in."
+            Log.w(TAG, "$msg ${e.message}")
+            _authError.value = msg
+            Result.failure(e)
         } catch (e: GetCredentialException) {
             _isSigningIn.value = false
             Log.e(TAG, "CredentialManager error: ${e.message}", e)
@@ -98,9 +107,9 @@ class FirebaseAuthManager(private val context: Context) {
         }
     }
 
-    suspend fun signOut() {
+    suspend fun signOut(activityContext: Context = appContext) {
         try {
-            credentialManager.clearCredentialState(ClearCredentialStateRequest())
+            CredentialManager.create(activityContext).clearCredentialState(ClearCredentialStateRequest())
         } catch (e: Exception) {
             Log.w(TAG, "Error clearing credential state: ${e.message}")
         }

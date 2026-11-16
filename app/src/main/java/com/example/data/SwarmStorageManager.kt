@@ -2,31 +2,52 @@ package com.example.data
 
 import android.content.Context
 import android.util.Log
-import kotlinx.coroutines.*
+import com.example.data.crypto.CryptoHelper
+import com.example.data.crypto.SecureVaultHelper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.io.File
 import java.io.RandomAccessFile
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
+import java.nio.ByteBuffer
+import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.concurrent.Semaphore
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import kotlin.random.Random
-import com.example.data.crypto.CryptoHelper
 
 /**
- * Sub-Zero Decentered Swarm Cryptographic Storage Node Core.
- * Manages physical pre-allocation of secure containers (min 16GB), 
- * AES-256 block-level encryption, and zero-tracker local UDP peer discovery.
+ * Local Cryptographic Storage & Authenticated Peer Shard Node.
+ * Manages encrypted container files (AES-256-GCM), strict ciphertext-only TCP shard serving
+ * with HMAC-SHA256 challenge-response authentication, and signed LAN UDP announcements.
+ * Disabled by default; activates only on explicit user action.
  */
 class SwarmStorageManager private constructor(private val context: Context) {
 
-    private val sharedPrefs = context.getSharedPreferences("swarm_storage_prefs", Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val sharedPrefs = appContext.getSharedPreferences("swarm_storage_prefs", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val tcpConcurrencyLimit = Semaphore(4)
+    private val containerLock = Any()
 
     // Node state flows
     private val _containerAllocatedSize = MutableStateFlow(sharedPrefs.getLong("allocated_size", 0L))
@@ -44,7 +65,7 @@ class SwarmStorageManager private constructor(private val context: Context) {
     private val _discoveredPeers = MutableStateFlow<List<SwarmPeer>>(emptyList())
     val discoveredPeers: StateFlow<List<SwarmPeer>> = _discoveredPeers.asStateFlow()
 
-    private val _nodeLogs = MutableStateFlow<List<String>>(listOf("System Initialized. Awaiting node activation..."))
+    private val _nodeLogs = MutableStateFlow<List<String>>(listOf("System Initialized. Node idle (disabled by default)."))
     val nodeLogs: StateFlow<List<String>> = _nodeLogs.asStateFlow()
 
     private val _isAllocating = MutableStateFlow(false)
@@ -54,7 +75,7 @@ class SwarmStorageManager private constructor(private val context: Context) {
     val allocationProgress: StateFlow<Float> = _allocationProgress.asStateFlow()
 
     private var activeSecretKey: SecretKeySpec? = null
-    private var containerFile: File = File(context.filesDir, "swarm_secure_container.img")
+    private var containerFile: File = File(appContext.filesDir, "swarm_secure_container.img")
 
     // UDP Peer Discovery Socket
     private var discoverySocket: DatagramSocket? = null
@@ -62,8 +83,9 @@ class SwarmStorageManager private constructor(private val context: Context) {
     private var listenJob: Job? = null
 
     // TCP Shard Streaming Server Socket
-    private var tcpServerSocket: java.net.ServerSocket? = null
+    private var tcpServerSocket: ServerSocket? = null
     private var tcpServerJob: Job? = null
+    private var allocationJob: Job? = null
 
     companion object {
         @Volatile
@@ -71,21 +93,22 @@ class SwarmStorageManager private constructor(private val context: Context) {
 
         fun getInstance(context: Context): SwarmStorageManager {
             return INSTANCE ?: synchronized(this) {
-                val instance = SwarmStorageManager(context.applicationContext)
-                INSTANCE = instance
-                instance
+                INSTANCE ?: SwarmStorageManager(context.applicationContext).also { INSTANCE = it }
             }
         }
 
         private const val UDP_DISCOVERY_PORT = 9944
-        private const val TCP_STREAM_PORT = 9945
+        const val TCP_STREAM_PORT = 9945
         private const val SHARD_SIZE_BYTES = 4 * 1024 * 1024 // 4 MB Shards
+        private const val HEADER_OFFSET_BYTES = 100L
+        private const val CHALLENGE_SIZE_BYTES = 32
+        private const val HASH_SIZE_BYTES = 32
+        private const val SOCKET_TIMEOUT_MS = 5_000
     }
 
     init {
-        // Log the initial state
         if (containerFile.exists()) {
-            addLog("Found existing container file. Size: ${containerFile.length() / (1024 * 1024)} MB.")
+            addLog("Found existing encrypted container. Size: ${containerFile.length() / (1024 * 1024)} MB.")
             if (_containerAllocatedSize.value == 0L) {
                 _containerAllocatedSize.value = containerFile.length()
             }
@@ -101,11 +124,6 @@ class SwarmStorageManager private constructor(private val context: Context) {
         _nodeLogs.value = current
     }
 
-    /**
-     * Physcially allocates a high-capacity crypto container on disk.
-     * Uses RandomAccessFile.setLength() to reserve the actual device storage block, 
-     * then initializes the cryptographic header layout with derived salt/magic bytes.
-     */
     fun allocateContainer(sizeInBytes: Long, passphrase: String, onFinished: (Boolean) -> Unit) {
         if (_isAllocating.value) {
             addLog("Allocation job already in progress!")
@@ -114,189 +132,173 @@ class SwarmStorageManager private constructor(private val context: Context) {
 
         _isAllocating.value = true
         _allocationProgress.value = 0.05f
-        addLog("Pre-allocating ${sizeInBytes / (1024 * 1024 * 1024.0)} GB file structure: '$containerFile'...")
+        addLog("Preparing local encrypted storage container (${sizeInBytes / (1024 * 1024)} MB)...")
 
-        scope.launch {
+        allocationJob?.cancel()
+        allocationJob = scope.launch {
             try {
-                if (containerFile.exists()) {
-                    containerFile.delete()
+                synchronized(containerLock) {
+                    if (containerFile.exists()) {
+                        containerFile.delete()
+                    }
+                    containerFile.parentFile?.mkdirs()
+
+                    RandomAccessFile(containerFile, "rw").use { raf ->
+                        raf.setLength(sizeInBytes)
+                        _allocationProgress.value = 0.3f
+
+                        val salt = ByteArray(32).also { SecureRandom().nextBytes(it) }
+                        raf.seek(0)
+                        raf.write(salt)
+
+                        val key = deriveKey(passphrase, salt)
+                        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                        val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
+                        cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
+                        val encryptedSig = cipher.doFinal("SWARM_CONTAINER_V1_MOUNTED".toByteArray(Charsets.UTF_8))
+
+                        raf.write(iv)
+                        raf.write(encryptedSig)
+                    }
                 }
-
-                // Create directory if not exists
-                containerFile.parentFile?.mkdirs()
-
-                // Physically set the size (instant space reservation on modern Android FS)
-                val raf = RandomAccessFile(containerFile, "rw")
-                raf.setLength(sizeInBytes)
-
-                _allocationProgress.value = 0.3f
-                addLog("File size initialized. Generating cryptographic block header structures...")
-
-                // Write Cryptographic salt and Magic block to confirm password mounts later
-                val salt = ByteArray(32)
-                SecureRandom().nextBytes(salt)
-                raf.seek(0)
-                raf.write(salt) // 32 bytes of random salt
-
-                // Derive key from password & salt
-                val key = deriveKey(passphrase, salt)
-                
-                // Encrypt "SWARM_ACTIVE" signature block to verify password on mount
-                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                val iv = ByteArray(12)
-                SecureRandom().nextBytes(iv)
-                cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
-                
-                val signatureBytes = "SWARM_CONTAINER_V1_MOUNTED".toByteArray(Charsets.UTF_8)
-                val encryptedSig = cipher.doFinal(signatureBytes)
-
-                // Write initialization headers:
-                // [32 bytes SALT] + [12 bytes IV] + [encrypted signatures and metadata]
-                raf.write(iv)
-                raf.write(encryptedSig)
-                raf.close()
 
                 _containerAllocatedSize.value = sizeInBytes
                 sharedPrefs.edit().putLong("allocated_size", sizeInBytes).apply()
                 _allocationProgress.value = 1.0f
 
-                addLog("Cryptographic space pre-allocation completed. Ready to mount.")
-                withContext(Dispatchers.Main) {
-                    onFinished(true)
-                }
+                addLog("Cryptographic container initialized. Ready to mount.")
+                withContext(Dispatchers.Main) { onFinished(true) }
             } catch (e: Exception) {
                 Log.e("SwarmStorage", "Allocation failed", e)
-                addLog("Critical: Pre-allocation error: ${e.message}")
+                addLog("Critical: Container initialization error: ${e.message}")
                 _allocationProgress.value = 0f
-                withContext(Dispatchers.Main) {
-                    onFinished(false)
-                }
+                withContext(Dispatchers.Main) { onFinished(false) }
             } finally {
                 _isAllocating.value = false
             }
         }
     }
 
-    /**
-     * Purges and deletes the container from disk, freeing all allocated space.
-     */
     fun deallocateContainer() {
         unmountContainer()
-        if (containerFile.exists()) {
-            val deleted = containerFile.delete()
-            if (deleted) {
-                _containerAllocatedSize.value = 0L
-                sharedPrefs.edit().putLong("allocated_size", 0L).apply()
-                addLog("Physical crypto-container wiped. ${containerFile.name} purged from device disk.")
+        synchronized(containerLock) {
+            if (containerFile.exists()) {
+                val deleted = containerFile.delete()
+                if (deleted) {
+                    _containerAllocatedSize.value = 0L
+                    sharedPrefs.edit().putLong("allocated_size", 0L).apply()
+                    addLog("Crypto-container purged from device disk.")
+                } else {
+                    addLog("Error: Unable to delete container file.")
+                }
             } else {
-                addLog("Error: Unable to delete container file.")
+                addLog("No active container exists to deallocate.")
             }
-        } else {
-            addLog("No active container exists to deallocate.")
         }
     }
 
-    /**
-     * Mounts the cryptographic volume. Derives the key and validates the security signature block.
-     */
     fun mountContainer(passphrase: String): Boolean {
-        if (!containerFile.exists()) {
-            addLog("Error: Cryptographic image file not found. Pre-allocate storage first.")
-            return false
-        }
-
-        try {
-            val raf = RandomAccessFile(containerFile, "r")
-            val salt = ByteArray(32)
-            raf.readFully(salt)
-
-            val iv = ByteArray(12)
-            raf.readFully(iv)
-
-            val encryptedSig = ByteArray(42) // Signature text length with GCM tag (26 + 16 = 42)
-            raf.readFully(encryptedSig)
-            raf.close()
-
-            // Derive key
-            val key = deriveKey(passphrase, salt)
-
-            // Attempt decryption of magic payload
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
-            val decrypted = cipher.doFinal(encryptedSig)
-            val sigText = String(decrypted, Charsets.UTF_8)
-
-            if (sigText == "SWARM_CONTAINER_V1_MOUNTED") {
-                activeSecretKey = key
-                _containerMounted.value = true
-                addLog("Volume mounted successfully! Cryptographic partition is now decrypted and unlocked in-memory.")
-                return true
-            } else {
-                addLog("Mount failure: Signature mismatch. Check passphrase integrity.")
+        synchronized(containerLock) {
+            if (!containerFile.exists()) {
+                addLog("Error: Cryptographic image file not found. Allocate container first.")
                 return false
             }
-        } catch (e: Exception) {
-            Log.e("SwarmStorage", "Mount failed", e)
-            addLog("Mount failure: Passphrase decryption rejected. Volume remains encrypted.")
-            return false
+
+            return try {
+                val salt = ByteArray(32)
+                val iv = ByteArray(12)
+                val encryptedSig = ByteArray(42)
+
+                RandomAccessFile(containerFile, "r").use { raf ->
+                    raf.readFully(salt)
+                    raf.readFully(iv)
+                    raf.readFully(encryptedSig)
+                }
+
+                val key = deriveKey(passphrase, salt)
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
+                val sigText = String(cipher.doFinal(encryptedSig), Charsets.UTF_8)
+
+                if (sigText == "SWARM_CONTAINER_V1_MOUNTED") {
+                    activeSecretKey = key
+                    _containerMounted.value = true
+                    addLog("Volume mounted. Decryption key active strictly in local memory.")
+                    true
+                } else {
+                    addLog("Mount failure: Signature mismatch.")
+                    false
+                }
+            } catch (e: Exception) {
+                Log.e("SwarmStorage", "Mount failed", e)
+                addLog("Mount failure: Passphrase rejected. Volume remains locked.")
+                false
+            }
         }
     }
 
     fun unmountContainer() {
         activeSecretKey = null
         _containerMounted.value = false
-        addLog("Volume unmounted. Keys purged from volatile RAM.")
+        addLog("Volume unmounted. Active key reference cleared.")
     }
 
-    /**
-     * Writes an encrypted block shard to the pre-allocated volume.
-     */
+    private fun maxShardCount(): Int {
+        val usable = (_containerAllocatedSize.value - HEADER_OFFSET_BYTES).coerceAtLeast(0L)
+        return (usable / SHARD_SIZE_BYTES).toInt().coerceAtLeast(0)
+    }
+
+    private fun isValidShardIndex(shardIndex: Int): Boolean {
+        return shardIndex >= 0 && shardIndex < maxShardCount()
+    }
+
     fun writeShardBlock(shardIndex: Int, data: ByteArray): Boolean {
         val key = activeSecretKey
         if (key == null || !_containerMounted.value) {
             addLog("Write blocked: Volume is currently unmounted.")
             return false
         }
-
-        try {
-            if (data.size > SHARD_SIZE_BYTES - 100) {
-                addLog("Error: Data block size exceeds limits of virtual 4MB Shard.")
-                return false
-            }
-
-            // Offset calculation: Header (salt 32 + iv 12 + sig 42 = 86 bytes) + (index * SHARD_SIZE)
-            val offset = 100L + (shardIndex * SHARD_SIZE_BYTES.toLong())
-            val maxOffset = _containerAllocatedSize.value
-            if (offset + SHARD_SIZE_BYTES > maxOffset) {
-                addLog("Error: Shard write index out of bounds of current allocation partition.")
-                return false
-            }
-
-            // Encrypt block
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            val iv = ByteArray(12)
-            SecureRandom().nextBytes(iv)
-            cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
-            val encryptedData = cipher.doFinal(data)
-
-            val raf = RandomAccessFile(containerFile, "rw")
-            raf.seek(offset)
-            raf.write(iv)
-            raf.writeInt(encryptedData.size)
-            raf.write(encryptedData)
-            raf.close()
-
-            addLog("Swarm Shard #$shardIndex compiled and committed to physical disk storage.")
-            return true
-        } catch (e: Exception) {
-            Log.e("SwarmStorage", "Block write failed", e)
-            addLog("Error writing shard block: ${e.message}")
+        if (shardIndex < 0) {
+            addLog("Write blocked: Negative shard index $shardIndex.")
             return false
+        }
+
+        return synchronized(containerLock) {
+            try {
+                if (data.size > SHARD_SIZE_BYTES - 100) {
+                    addLog("Error: Data block exceeds 4MB shard limit.")
+                    return@synchronized false
+                }
+                if (!isValidShardIndex(shardIndex)) {
+                    addLog("Error: Shard index #$shardIndex out of bounds.")
+                    return@synchronized false
+                }
+
+                val offset = HEADER_OFFSET_BYTES + (shardIndex * SHARD_SIZE_BYTES.toLong())
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
+                cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
+                val encryptedData = cipher.doFinal(data)
+
+                RandomAccessFile(containerFile, "rw").use { raf ->
+                    raf.seek(offset)
+                    raf.write(iv)
+                    raf.writeInt(encryptedData.size)
+                    raf.write(encryptedData)
+                }
+
+                addLog("Swarm Shard #$shardIndex encrypted and committed locally.")
+                true
+            } catch (e: Exception) {
+                Log.e("SwarmStorage", "Block write failed", e)
+                addLog("Error writing shard block: ${e.message}")
+                false
+            }
         }
     }
 
     /**
-     * Reads and decrypts a block shard from the pre-allocated volume.
+     * Local-only decryption for the device owner. NEVER exposed over network sockets.
      */
     fun readShardBlock(shardIndex: Int): ByteArray? {
         val key = activeSecretKey
@@ -304,37 +306,96 @@ class SwarmStorageManager private constructor(private val context: Context) {
             addLog("Read blocked: Volume is unmounted.")
             return null
         }
+        if (!isValidShardIndex(shardIndex)) return null
 
-        try {
-            val offset = 100L + (shardIndex * SHARD_SIZE_BYTES.toLong())
-            val maxOffset = _containerAllocatedSize.value
-            if (offset + SHARD_SIZE_BYTES > maxOffset) {
-                return null
+        return synchronized(containerLock) {
+            try {
+                val offset = HEADER_OFFSET_BYTES + (shardIndex * SHARD_SIZE_BYTES.toLong())
+                val iv = ByteArray(12)
+                var size = 0
+                val encryptedData: ByteArray
+
+                RandomAccessFile(containerFile, "r").use { raf ->
+                    raf.seek(offset)
+                    raf.readFully(iv)
+                    size = raf.readInt()
+                    if (size <= 0 || size > SHARD_SIZE_BYTES) {
+                        return@synchronized null
+                    }
+                    encryptedData = ByteArray(size)
+                    raf.readFully(encryptedData)
+                }
+
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
+                cipher.doFinal(encryptedData)
+            } catch (e: Exception) {
+                Log.e("SwarmStorage", "Block read failed", e)
+                null
             }
+        }
+    }
 
-            val raf = RandomAccessFile(containerFile, "r")
-            raf.seek(offset)
-            
-            val iv = ByteArray(12)
-            raf.readFully(iv)
-            
-            val size = raf.readInt()
-            if (size <= 0 || size > SHARD_SIZE_BYTES) {
-                raf.close()
-                return null
+    /**
+     * Reads ONLY the raw encrypted frame ([12B IV][4B size][AES-GCM ciphertext]) for network replication.
+     * Decryption never occurs here and plaintext never leaves the device.
+     */
+    fun readEncryptedShardFrame(shardIndex: Int): ByteArray? {
+        if (!containerFile.exists() || !isValidShardIndex(shardIndex)) return null
+
+        return synchronized(containerLock) {
+            try {
+                val offset = HEADER_OFFSET_BYTES + (shardIndex * SHARD_SIZE_BYTES.toLong())
+                RandomAccessFile(containerFile, "r").use { raf ->
+                    raf.seek(offset)
+                    val iv = ByteArray(12)
+                    raf.readFully(iv)
+                    val size = raf.readInt()
+                    if (size <= 0 || size > SHARD_SIZE_BYTES - 16) {
+                        return@synchronized null
+                    }
+                    val encryptedData = ByteArray(size)
+                    raf.readFully(encryptedData)
+
+                    ByteBuffer.allocate(12 + 4 + size)
+                        .put(iv)
+                        .putInt(size)
+                        .put(encryptedData)
+                        .array()
+                }
+            } catch (e: Exception) {
+                Log.e("SwarmStorage", "Encrypted frame read failed", e)
+                null
             }
-            
-            val encryptedData = ByteArray(size)
-            raf.readFully(encryptedData)
-            raf.close()
+        }
+    }
 
-            // Decrypt
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
-            return cipher.doFinal(encryptedData)
-        } catch (e: Exception) {
-            Log.e("SwarmStorage", "Block read failed", e)
-            return null
+    /**
+     * Stores an already-encrypted shard frame fetched from an authenticated peer directly to disk.
+     */
+    fun writeEncryptedShardFrame(shardIndex: Int, frame: ByteArray): Boolean {
+        if (!containerFile.exists() || !isValidShardIndex(shardIndex)) return false
+        if (frame.size <= 16 || frame.size > SHARD_SIZE_BYTES) return false
+
+        val buf = ByteBuffer.wrap(frame)
+        val iv = ByteArray(12)
+        buf.get(iv)
+        val encLen = buf.int
+        if (encLen <= 0 || encLen != frame.size - 16) return false
+
+        return synchronized(containerLock) {
+            try {
+                val offset = HEADER_OFFSET_BYTES + (shardIndex * SHARD_SIZE_BYTES.toLong())
+                RandomAccessFile(containerFile, "rw").use { raf ->
+                    raf.seek(offset)
+                    raf.write(frame)
+                }
+                addLog("Stored encrypted replica frame for Shard #$shardIndex (${frame.size} bytes).")
+                true
+            } catch (e: Exception) {
+                Log.e("SwarmStorage", "Failed storing encrypted shard frame", e)
+                false
+            }
         }
     }
 
@@ -344,51 +405,92 @@ class SwarmStorageManager private constructor(private val context: Context) {
         addLog("Node operational level set to: $role.")
     }
 
+    private fun buildChallengeHmac(clusterKey: ByteArray, challenge: ByteArray, shardIndex: Int): ByteArray {
+        val msg = ByteBuffer.allocate(challenge.size + 4)
+            .put(challenge)
+            .putInt(shardIndex)
+            .array()
+        return SecureVaultHelper.computeHmacSha256(clusterKey, msg)
+    }
+
     /**
-     * Starts the TCP server for hosting and streaming encrypted shards to connected peers.
+     * Authenticated ciphertext-only TCP server on port 9945:
+     * 1. Sends 32-byte random challenge.
+     * 2. Verifies client HMAC-SHA256(clusterKey, challenge || shardIndex) in constant time.
+     * 3. Validates shardIndex bounds and streams encrypted frame + SHA-256 digest (NEVER plaintext).
      */
     private fun startTcpServer() {
+        val clusterKey = SecureVaultHelper.getOrCreateSwarmClusterKey(appContext)
         tcpServerJob = scope.launch(Dispatchers.IO) {
             try {
-                val serverSocket = java.net.ServerSocket(TCP_STREAM_PORT)
+                val serverSocket = ServerSocket(TCP_STREAM_PORT)
                 tcpServerSocket = serverSocket
-                addLog("📡 TCP Shard Streaming Server listening on port $TCP_STREAM_PORT.")
-                
+                addLog("📡 Authenticated Encrypted TCP Shard Server listening on port $TCP_STREAM_PORT.")
+
                 while (isActive) {
                     val clientSocket = try {
                         serverSocket.accept()
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         break
                     }
-                    
+
+                    if (!tcpConcurrencyLimit.tryAcquire()) {
+                        runCatching { clientSocket.close() }
+                        continue
+                    }
+
                     scope.launch(Dispatchers.IO) {
                         try {
                             clientSocket.use { socket ->
-                                val input = java.io.DataInputStream(socket.getInputStream())
-                                val output = java.io.DataOutputStream(socket.getOutputStream())
-                                
+                                socket.soTimeout = SOCKET_TIMEOUT_MS
+                                val input = DataInputStream(socket.getInputStream())
+                                val output = DataOutputStream(socket.getOutputStream())
+
+                                val challenge = ByteArray(CHALLENGE_SIZE_BYTES).also { SecureRandom().nextBytes(it) }
+                                output.write(challenge)
+                                output.flush()
+
+                                val clientMac = ByteArray(HASH_SIZE_BYTES)
+                                input.readFully(clientMac)
                                 val requestedIndex = input.readInt()
-                                addLog("📥 TCP: Received query for Shard #$requestedIndex from ${socket.inetAddress.hostAddress}")
-                                
-                                val shardBytes = readShardBlock(requestedIndex)
-                                if (shardBytes != null) {
-                                    output.writeInt(shardBytes.size)
-                                    output.write(shardBytes)
+
+                                val expectedMac = buildChallengeHmac(clusterKey, challenge, requestedIndex)
+                                if (!MessageDigest.isEqual(expectedMac, clientMac)) {
+                                    output.writeInt(-2) // Auth rejected
                                     output.flush()
-                                    addLog("📤 TCP: Streamed Shard #$requestedIndex (${shardBytes.size} bytes) to ${socket.inetAddress.hostAddress} successfully.")
+                                    addLog("⛔ TCP: Rejected unauthenticated shard request for #$requestedIndex.")
+                                    return@use
+                                }
+
+                                if (!isValidShardIndex(requestedIndex)) {
+                                    output.writeInt(-1)
+                                    output.flush()
+                                    addLog("⚠️ TCP: Out-of-bounds shard request #$requestedIndex rejected.")
+                                    return@use
+                                }
+
+                                val encryptedFrame = readEncryptedShardFrame(requestedIndex)
+                                if (encryptedFrame != null) {
+                                    val digest = MessageDigest.getInstance("SHA-256").digest(encryptedFrame)
+                                    output.writeInt(encryptedFrame.size)
+                                    output.write(encryptedFrame)
+                                    output.write(digest)
+                                    output.flush()
+                                    addLog("📤 TCP: Served encrypted frame for Shard #$requestedIndex (${encryptedFrame.size} bytes).")
                                 } else {
-                                    output.writeInt(-1) // Signal block unavailable/locked
+                                    output.writeInt(-1)
                                     output.flush()
-                                    addLog("⚠️ TCP: Requested Shard #$requestedIndex from ${socket.inetAddress.hostAddress} is unavailable or volume locked.")
                                 }
                             }
                         } catch (e: Exception) {
-                            Log.e("SwarmTcp", "Error processing client connection", e)
+                            Log.e("SwarmTcp", "Error processing TCP peer connection", e)
+                        } finally {
+                            tcpConcurrencyLimit.release()
                         }
                     }
                 }
             } catch (e: Exception) {
-                Log.e("SwarmTcp", "TCP Server crashed or closed", e)
+                Log.e("SwarmTcp", "TCP Server stopped", e)
                 addLog("⚠️ TCP Server stopped: ${e.message}")
             }
         }
@@ -396,115 +498,129 @@ class SwarmStorageManager private constructor(private val context: Context) {
 
     private fun stopTcpServer() {
         tcpServerJob?.cancel()
-        try {
-            tcpServerSocket?.close()
-        } catch (e: Exception) {
-            Log.e("SwarmTcp", "Error closing server socket", e)
-        }
+        runCatching { tcpServerSocket?.close() }
         tcpServerSocket = null
         tcpServerJob = null
-        addLog("TCP Shard Streaming Server is OFFLINE.")
+        addLog("TCP Shard Server is OFFLINE.")
     }
 
     /**
-     * Connects to a peer on TCP port 9945 and retrieves an encrypted block shard.
+     * Connects to an authenticated peer on TCP port 9945, completes HMAC-SHA256 handshake,
+     * downloads encrypted shard frame, and verifies SHA-256 integrity hash.
      */
     fun fetchShardFromPeer(peerIp: String, shardIndex: Int): ByteArray? {
-        addLog("🔌 TCP: Connecting to peer $peerIp to download Swarm Shard #$shardIndex...")
+        if (shardIndex < 0) return null
+        val clusterKey = SecureVaultHelper.getOrCreateSwarmClusterKey(appContext)
+        addLog("🔌 TCP: Connecting to peer node for encrypted Shard #$shardIndex...")
         return try {
-            java.net.Socket().use { socket ->
-                socket.connect(java.net.InetSocketAddress(peerIp, TCP_STREAM_PORT), 5000) // 5s timeout
-                val output = java.io.DataOutputStream(socket.getOutputStream())
-                val input = java.io.DataInputStream(socket.getInputStream())
-                
-                // Request the shard index
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(peerIp, TCP_STREAM_PORT), SOCKET_TIMEOUT_MS)
+                socket.soTimeout = SOCKET_TIMEOUT_MS
+                val output = DataOutputStream(socket.getOutputStream())
+                val input = DataInputStream(socket.getInputStream())
+
+                val challenge = ByteArray(CHALLENGE_SIZE_BYTES)
+                input.readFully(challenge)
+
+                val mac = buildChallengeHmac(clusterKey, challenge, shardIndex)
+                output.write(mac)
                 output.writeInt(shardIndex)
                 output.flush()
-                
-                // Read response payload size
+
                 val size = input.readInt()
-                if (size <= 0) {
-                    addLog("⚠️ TCP: Peer $peerIp reported block #$shardIndex is locked or empty.")
+                if (size == -2) {
+                    addLog("⛔ TCP: Peer rejected cluster authentication.")
+                    null
+                } else if (size <= 0) {
+                    addLog("⚠️ TCP: Peer reported encrypted shard #$shardIndex unavailable.")
                     null
                 } else if (size > SHARD_SIZE_BYTES) {
-                    addLog("⚠️ TCP: Peer $peerIp returned anomalous chunk size ($size bytes). Rejected.")
+                    addLog("⚠️ TCP: Peer returned anomalous payload size ($size bytes). Rejected.")
                     null
                 } else {
-                    val buffer = ByteArray(size)
-                    input.readFully(buffer)
-                    addLog("✅ TCP: Successfully streamed Shard #$shardIndex ($size bytes) from peer $peerIp.")
-                    buffer
+                    val frame = ByteArray(size)
+                    input.readFully(frame)
+                    val peerDigest = ByteArray(HASH_SIZE_BYTES)
+                    input.readFully(peerDigest)
+
+                    val actualDigest = MessageDigest.getInstance("SHA-256").digest(frame)
+                    if (!MessageDigest.isEqual(actualDigest, peerDigest)) {
+                        addLog("⛔ TCP: Shard #$shardIndex integrity digest mismatch! Discarded.")
+                        return null
+                    }
+                    addLog("✅ TCP: Verified & received encrypted Shard #$shardIndex ($size bytes).")
+                    frame
                 }
             }
         } catch (e: Exception) {
-            Log.e("SwarmTcp", "Failed to fetch shard from peer $peerIp", e)
-            addLog("❌ TCP: Connection to $peerIp failed: ${e.message}")
+            Log.e("SwarmTcp", "Failed to fetch shard from peer", e)
+            addLog("❌ TCP: Peer connection failed: ${e.message}")
             null
         }
     }
 
-    /**
-     * Starts the fully decentral, zero-tracker Local P2P Swarm Discovery Node.
-     * Uses UDP Broadcast to communicate with other nodes on the subnet, totally independent of public servers.
-     */
     fun startNode() {
         if (_nodeActive.value) return
         _nodeActive.value = true
-        addLog("Activating Sub-Zero Node Server on UDP Port $UDP_DISCOVERY_PORT...")
+        val clusterKey = SecureVaultHelper.getOrCreateSwarmClusterKey(appContext)
+        addLog("Activating Local Swarm Node on UDP $UDP_DISCOVERY_PORT / TCP $TCP_STREAM_PORT...")
 
-        // Start TCP Streaming Server
         startTcpServer()
 
         scope.launch {
             try {
-                // Open dynamic socket supporting broadcasts
-                val socket = DatagramSocket(UDP_DISCOVERY_PORT).apply {
-                    broadcast = true
-                }
+                val socket = DatagramSocket(UDP_DISCOVERY_PORT).apply { broadcast = true }
                 discoverySocket = socket
 
-                // 1. Broadcast presence thread
                 broadcastJob = scope.launch {
                     val nodeId = "node_" + Random.nextInt(100000, 999999)
                     while (isActive) {
                         try {
                             val activeSizeGb = String.format("%.2f", _containerAllocatedSize.value / (1024 * 1024 * 1024.0))
-                            val payload = "SWARM_ANNOUNCE|$nodeId|${_nodeRole.value}|$activeSizeGb|${if (_containerMounted.value) "MOUNTED" else "LOCKED"}"
-                            val bytes = payload.toByteArray()
-                            
-                            // Send broadcast to subnet
+                            val body = "SWARM_ANNOUNCE|$nodeId|${_nodeRole.value}|$activeSizeGb|${if (_containerMounted.value) "MOUNTED" else "LOCKED"}"
+                            val sigHex = SecureVaultHelper.computeHmacSha256(clusterKey, body.toByteArray(Charsets.UTF_8))
+                                .joinToString("") { "%02x".format(it) }
+                            val bytes = "$body|$sigHex".toByteArray(Charsets.UTF_8)
+
                             val address = InetAddress.getByName("255.255.255.255")
                             val packet = DatagramPacket(bytes, bytes.size, address, UDP_DISCOVERY_PORT)
                             socket.send(packet)
                         } catch (e: Exception) {
                             Log.e("SwarmNode", "Broadcast send error", e)
                         }
-                        delay(5000) // Announce every 5 seconds
+                        delay(5000)
                     }
                 }
 
-                // 2. Listening thread for discovery
                 listenJob = scope.launch {
                     val buffer = ByteArray(1024)
                     while (isActive) {
                         try {
                             val packet = DatagramPacket(buffer, buffer.size)
                             socket.receive(packet)
-                            
-                            val rawText = String(packet.data, 0, packet.length)
-                            if (rawText.startsWith("SWARM_ANNOUNCE")) {
+
+                            val rawText = String(packet.data, 0, packet.length, Charsets.UTF_8)
+                            if (rawText.startsWith("SWARM_ANNOUNCE|")) {
                                 val parts = rawText.split("|")
-                                if (parts.size >= 5) {
+                                if (parts.size >= 6) {
+                                    val body = parts.subList(0, 5).joinToString("|")
+                                    val expectedSigHex = SecureVaultHelper.computeHmacSha256(
+                                        clusterKey,
+                                        body.toByteArray(Charsets.UTF_8)
+                                    ).joinToString("") { "%02x".format(it) }
+                                    if (!CryptoHelper.constantTimeEquals(parts[5], expectedSigHex)) {
+                                        continue
+                                    }
+
                                     val peerId = parts[1]
                                     val peerRole = parts[2]
                                     val peerSize = parts[3]
                                     val peerStatus = parts[4]
                                     val peerIp = packet.address.hostAddress ?: "Unknown"
 
-                                    // Check if we already know this peer
                                     val currentPeers = _discoveredPeers.value.toMutableList()
                                     val index = currentPeers.indexOfFirst { it.id == peerId }
-                                    
+
                                     val updatedPeer = SwarmPeer(
                                         id = peerId,
                                         ip = peerIp,
@@ -518,14 +634,12 @@ class SwarmStorageManager private constructor(private val context: Context) {
                                         currentPeers[index] = updatedPeer
                                     } else {
                                         currentPeers.add(updatedPeer)
-                                        addLog("📡 SWARM: Discovered new local node peer '$peerId' at IP $peerIp.")
+                                        addLog("📡 SWARM: Verified local peer '$peerId' discovered.")
                                     }
 
-                                    // Filter out dead nodes (no ping in 15 seconds)
-                                    val filtered = currentPeers.filter { 
-                                        System.currentTimeMillis() - it.lastSeen < 15000 
+                                    _discoveredPeers.value = currentPeers.filter {
+                                        System.currentTimeMillis() - it.lastSeen < 15_000
                                     }
-                                    _discoveredPeers.value = filtered
                                 }
                             }
                         } catch (e: Exception) {
@@ -535,11 +649,10 @@ class SwarmStorageManager private constructor(private val context: Context) {
                     }
                 }
 
-                addLog("Local Swarm discovery listener is ONLINE. Broadcasting signal packets.")
-
+                addLog("Authenticated LAN Swarm listener is ONLINE.")
             } catch (e: Exception) {
                 Log.e("SwarmNode", "Node socket start failed", e)
-                addLog("Node activation failed: ${e.message}. Ensure port $UDP_DISCOVERY_PORT is free.")
+                addLog("Node activation failed: ${e.message}.")
                 _nodeActive.value = false
             }
         }
@@ -548,22 +661,34 @@ class SwarmStorageManager private constructor(private val context: Context) {
     fun stopNode() {
         if (!_nodeActive.value) return
         _nodeActive.value = false
-        addLog("Shutting down local Swarm broadcasts and closing UDP ports...")
-        
+        addLog("Shutting down Swarm broadcasts and closing sockets...")
+
         broadcastJob?.cancel()
         listenJob?.cancel()
-        discoverySocket?.close()
+        runCatching { discoverySocket?.close() }
         discoverySocket = null
-        
-        // Stop TCP Streaming Server
+
         stopTcpServer()
-        
+
         _discoveredPeers.value = emptyList()
         addLog("Swarm node is OFFLINE.")
     }
 
+    /**
+     * Releases all background jobs, sockets, and mounted key references safely
+     * while keeping the singleton's SupervisorJob usable if reactivated later.
+     */
+    fun shutdown() {
+        stopNode()
+        unmountContainer()
+        allocationJob?.cancel()
+        allocationJob = null
+        _isAllocating.value = false
+        scope.coroutineContext[Job]?.cancelChildren()
+        addLog("Swarm manager background workers shut down.")
+    }
+
     private fun deriveKey(password: String, salt: ByteArray): SecretKeySpec {
-        // OWASP PBKDF2-HMAC-SHA256 derivation with 210,000 iterations
         return CryptoHelper.deriveKeyPbkdf2(
             passphrase = password.toCharArray(),
             salt = salt,

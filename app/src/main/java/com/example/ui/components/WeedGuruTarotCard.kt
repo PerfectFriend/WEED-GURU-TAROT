@@ -21,10 +21,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -742,7 +742,7 @@ fun WeedGuruTarotCard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.RotateRight,
+                                    imageVector = Icons.AutoMirrored.Filled.RotateRight,
                                     contentDescription = "Flip Card",
                                     tint = seriesTheme.goldPrimary,
                                     modifier = Modifier.size(if (compact) 11.dp else 13.dp)
@@ -894,7 +894,7 @@ fun WeedGuruTarotCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.RotateRight,
+                            imageVector = Icons.AutoMirrored.Filled.RotateRight,
                             contentDescription = "Flip Back to Front",
                             tint = seriesTheme.goldPrimary,
                             modifier = Modifier.size(if (compact) 12.dp else 14.dp)
@@ -1155,7 +1155,7 @@ fun WeedGuruFullscreenCardViewer(
                             .testTag("fullscreen_flip_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.RotateRight,
+                            imageVector = Icons.AutoMirrored.Filled.RotateRight,
                             contentDescription = if (isFlipped) {
                                 if (systemLanguage == "ru") "Показать лицо карты" else "Show card front"
                             } else {

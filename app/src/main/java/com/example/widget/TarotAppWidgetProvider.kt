@@ -37,9 +37,18 @@ class TarotAppWidgetProvider : AppWidgetProvider() {
             val day = cal.get(Calendar.DAY_OF_MONTH)
             val dayOfYear = cal.get(Calendar.DAY_OF_YEAR)
 
+            val prefs = context.getSharedPreferences("neuro_tarot_prefs", Context.MODE_PRIVATE)
+            val savedLang = prefs.getString("system_language", null)
+            val deviceLang = java.util.Locale.getDefault().language
+            val activeLang = when {
+                !savedLang.isNullOrBlank() -> savedLang
+                deviceLang in listOf("en", "ru", "es", "zh", "fr", "de", "pt", "hi") -> deviceLang
+                else -> "en"
+            }
+
             // Lunar phase & minting info
-            val lunarInfo = LunarCalendarService.getLunarDayInfo(year, month, day, "ru")
-            val mintingWindow = LunarCalendarService.getTarotMintingWindow(year, month, day, "ru")
+            val lunarInfo = LunarCalendarService.getLunarDayInfo(year, month, day, activeLang)
+            val mintingWindow = LunarCalendarService.getTarotMintingWindow(year, month, day, activeLang)
 
             // Card of the Day
             val card = CyberTarotDeck.cards[dayOfYear % CyberTarotDeck.cards.size]
@@ -59,21 +68,73 @@ class TarotAppWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(
                 R.id.widget_core_status,
                 when (mintingWindow.tier) {
-                    com.example.data.MintingAuspiciousnessTier.AUSPICIOUS -> "MINT: AUSPICIOUS ✦"
-                    com.example.data.MintingAuspiciousnessTier.BALANCED -> "MINT: BALANCED ~"
-                    com.example.data.MintingAuspiciousnessTier.CHALLENGING -> "MINT: VOID FLUX ⚠"
+                    com.example.data.MintingAuspiciousnessTier.AUSPICIOUS -> when (activeLang) {
+                        "ru" -> "МИНТ: БЛАГОПРИЯТНО ✦"
+                        "es" -> "MINT: PROPICIO ✦"
+                        "zh" -> "铸造: 吉兆 ✦"
+                        "fr" -> "MINT: PROPICE ✦"
+                        "de" -> "MINT: GÜNSTIG ✦"
+                        "pt" -> "MINT: PROPÍCIO ✦"
+                        "hi" -> "मिंट: शुभ ✦"
+                        else -> "MINT: AUSPICIOUS ✦"
+                    }
+                    com.example.data.MintingAuspiciousnessTier.BALANCED -> when (activeLang) {
+                        "ru" -> "МИНТ: БАЛАНС ~"
+                        "es" -> "MINT: EQUILIBRIO ~"
+                        "zh" -> "铸造: 平衡 ~"
+                        "fr" -> "MINT: ÉQUILIBRE ~"
+                        "de" -> "MINT: AUSGEGLICHEN ~"
+                        "pt" -> "MINT: EQUILÍBRIO ~"
+                        "hi" -> "मिंट: संतुलित ~"
+                        else -> "MINT: BALANCED ~"
+                    }
+                    com.example.data.MintingAuspiciousnessTier.CHALLENGING -> when (activeLang) {
+                        "ru" -> "МИНТ: ВОЗМУЩЕНИЕ ⚠"
+                        "es" -> "MINT: INESTABLE ⚠"
+                        "zh" -> "铸造: 虚空波动 ⚠"
+                        "fr" -> "MINT: INSTABLE ⚠"
+                        "de" -> "MINT: INSTABIL ⚠"
+                        "pt" -> "MINT: INSTÁVEL ⚠"
+                        "hi" -> "मिंट: अस्थिर ⚠"
+                        else -> "MINT: VOID FLUX ⚠"
+                    }
                 }
             )
             views.setTextViewText(R.id.widget_element_icon, element.symbol)
-            views.setTextViewText(R.id.widget_card_title, card.name)
+            val localizedTitle = com.example.data.CardLocalizationHelper.getLocalizedName(card.index, activeLang)
+            val localizedTraditional = com.example.data.CardLocalizationHelper.getLocalizedTraditionalName(card.index, activeLang)
+            val localizedAdvice = com.example.data.CardLocalizationHelper.getLocalizedUprightAdvice(card.index, activeLang)
+            val oracleLabel = when (activeLang) {
+                "ru" -> "Оракул"
+                "es" -> "Oráculo"
+                "zh" -> "神谕"
+                "fr" -> "Oracle"
+                "de" -> "Orakel"
+                "pt" -> "Oráculo"
+                "hi" -> "ओरेकल"
+                else -> "Oracle"
+            }
+            val openHubPrompt = when (activeLang) {
+                "ru" -> "➔ ОТКРЫТЬ В ХАБЕ"
+                "es" -> "➔ ABRIR EN EL HUB"
+                "zh" -> "➔ 在中心打开"
+                "fr" -> "➔ OUVRIR DANS LE HUB"
+                "de" -> "➔ IM HUB ÖFFNEN"
+                "pt" -> "➔ ABRIR NO HUB"
+                "hi" -> "➔ हब में खोलें"
+                else -> "➔ OPEN IN HUB"
+            }
+
+            views.setTextViewText(R.id.widget_card_title, localizedTitle)
             views.setTextViewText(
                 R.id.widget_card_subtitle,
-                "${card.traditionalName} • ${card.defaultRarity}"
+                "$localizedTraditional • ${card.defaultRarity}"
             )
             views.setTextViewText(
                 R.id.widget_card_advice,
-                "Оракул: ${card.uprightAdvice}"
+                "$oracleLabel: $localizedAdvice"
             )
+            views.setTextViewText(R.id.widget_action_prompt, openHubPrompt)
 
             // Deep link into MainActivity
             val intent = Intent(context, MainActivity::class.java).apply {

@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">WEED GURU</string>
+    <string name="widget_label">Cyber Tarot: Card of the Day</string>
+    <string name="widget_default_lunar">🌔 Waxing Moon • 74%</string>
+    <string name="widget_default_status">CORE ONLINE ⚡</string>
+    <string name="widget_default_icon">🔮</string>
+    <string name="widget_default_title">The Budtender</string>
+    <string name="widget_default_subtitle">The Magician • Genesis</string>
+    <string name="widget_default_advice">Oracle: Mastery of the four elements. Begin a new cultivation cycle.</string>
+    <string name="widget_action_prompt">➔ OPEN IN HUB</string>
 </resources>

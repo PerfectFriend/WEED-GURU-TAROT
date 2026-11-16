@@ -76,4 +76,35 @@ class EncryptedMessageSecurityTest {
         val decryptAttempt = CryptoHelper.decryptAesGcm(tamperedCipher, encResult.ivBase64, key)
         assertFalse("Decryption of tampered ciphertext must fail authentication check", decryptAttempt.isSuccess)
     }
+
+    @Test
+    fun ecdhAndEcdsa_crossPartyKeyAgreement_andSignatureVerification() = runTest {
+        val alice = CryptoHelper.generateEcKeyPair()
+        val bob = CryptoHelper.generateEcKeyPair()
+
+        val aliceShared = CryptoHelper.deriveSharedChannelKey(
+            localPrivateKeyBase64 = alice.privateKeyBase64,
+            peerPublicKeyBase64 = bob.publicKeyBase64,
+            contextInfo = "WEEDGURU_CHANNEL_7"
+        )
+        val bobShared = CryptoHelper.deriveSharedChannelKey(
+            localPrivateKeyBase64 = bob.privateKeyBase64,
+            peerPublicKeyBase64 = alice.publicKeyBase64,
+            contextInfo = "WEEDGURU_CHANNEL_7"
+        )
+
+        val secret = "ECDH_P256_VERIFIED_CHANNEL_MESSAGE"
+        val encrypted = CryptoHelper.encryptAesGcm(secret, aliceShared)
+        val decrypted = CryptoHelper.decryptAesGcm(encrypted.ciphertextBase64, encrypted.ivBase64, bobShared)
+        assertTrue(decrypted.isSuccess)
+        assertEquals(secret, decrypted.getOrThrow())
+
+        // ECDSA P-256 signing & tamper detection
+        val payload = "TX|1|Netrunner|Peer|50".toByteArray(Charsets.UTF_8)
+        val sig = CryptoHelper.signEcdsa(payload, alice.privateKeyBase64)
+        assertTrue(CryptoHelper.verifyEcdsa(payload, sig, alice.publicKeyBase64))
+        assertFalse(CryptoHelper.verifyEcdsa("TX|1|Netrunner|Peer|500".toByteArray(Charsets.UTF_8), sig, alice.publicKeyBase64))
+        assertFalse(CryptoHelper.verifyEcdsa(payload, sig, bob.publicKeyBase64))
+    }
 }
+

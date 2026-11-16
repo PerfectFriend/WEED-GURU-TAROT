@@ -68,4 +68,65 @@ class NftMintingServiceTest {
         assertEquals("Must NOT generate a fake Etherscan URL for offline sandbox", "", result.explorerUrl)
         assertTrue("TxHash should exist for local sandbox tracking", result.txHash.startsWith("0x"))
     }
+
+    @Test
+    fun mintTarotNFT_reachableRpcWithoutSigner_returnsHonestReadOnlyFailure() = runTest {
+        val metadata = TarotNftMetadata(
+            cardIndex = 3,
+            name = "The Empress",
+            rarity = "Epic",
+            mintNumber = 7,
+            interpretation = "Abundance"
+        )
+
+        val serverSocket = java.net.ServerSocket(0)
+        val port = serverSocket.localPort
+        val serverThread = Thread {
+            try {
+                serverSocket.accept().use { client ->
+                    val reader = client.getInputStream().bufferedReader()
+                    while (true) {
+                        val line = reader.readLine() ?: break
+                        if (line.isEmpty()) break
+                    }
+                    val body = """{"jsonrpc":"2.0","id":1,"result":"0x1234"}"""
+                    val response = buildString {
+                        append("HTTP/1.1 200 OK\r\n")
+                        append("Content-Type: application/json\r\n")
+                        append("Content-Length: ${body.toByteArray().size}\r\n")
+                        append("Connection: close\r\n\r\n")
+                        append(body)
+                    }
+                    client.getOutputStream().write(response.toByteArray())
+                    client.getOutputStream().flush()
+                }
+            } catch (_: Exception) {
+            }
+        }
+        serverThread.start()
+
+        try {
+            val result = service.mintTarotNFT(
+                ownerAddress = "0x5555555555555555555555555555555555555555",
+                metadata = metadata,
+                rpcUrl = "http://127.0.0.1:$port/rpc",
+                contractAddress = "0x6666666666666666666666666666666666666666"
+            )
+
+            assertFalse("Read-only RPC without signer must return success=false", result.success)
+            assertEquals(0x1234L, result.blockNumber)
+            assertEquals("", result.txHash)
+            assertEquals("", result.explorerUrl)
+            assertTrue(result.isSimulated)
+            assertNotNull(result.errorMessage)
+            assertTrue(
+                "Error message must explain disabled on-chain minting / missing signer",
+                result.errorMessage!!.contains("signer", ignoreCase = true)
+            )
+        } finally {
+            runCatching { serverSocket.close() }
+            serverThread.join(1000)
+        }
+    }
 }
+

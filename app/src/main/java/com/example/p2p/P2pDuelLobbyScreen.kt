@@ -60,10 +60,10 @@ fun P2pDuelLobbyScreen(
 
     val baseNodes = remember(peerContacts) {
         listOf(
-            P2pNode("1", "Cipher_Alpha", "k2f3p9zk6h4pxz8m.onion", -42, 14, "Cyber Aggro ⚡"),
-            P2pNode("2", "Proxy_Net", "z4hk7xmp8qk2zlw3.onion", -58, 28, "Quantum Barrier 🔮"),
-            P2pNode("3", "Neon_Shadow_04", "m8qp2x7d1k9w4zla.onion", -65, 34, "Void Control 🌑"),
-            P2pNode("4", "Bio_Harvester", "h4jx9w2m8l1k7pzq.onion", -72, 45, "Bio Regen 🌿")
+            P2pNode("1", "Cipher_Alpha [SANDBOX]", "sandbox://peer-alpha", -42, 14, "Cyber Aggro ⚡"),
+            P2pNode("2", "Proxy_Net [SANDBOX]", "sandbox://peer-proxy", -58, 28, "Quantum Barrier 🔮"),
+            P2pNode("3", "Neon_Shadow_04 [SANDBOX]", "sandbox://peer-shadow", -65, 34, "Void Control 🌑"),
+            P2pNode("4", "Bio_Harvester [SANDBOX]", "sandbox://peer-bio", -72, 45, "Bio Regen 🌿")
         )
     }
 
@@ -107,7 +107,7 @@ fun P2pDuelLobbyScreen(
                 }
                 Column(modifier = Modifier.weight(1f).padding(end = 6.dp)) {
                     Text(
-                        text = if (lang == "ru") "P2P ДУЭЛИ И СЕТЬ" else "P2P DUEL & MESH LOBBY",
+                        text = if (lang == "ru") "🧪 SANDBOX P2P ДУЭЛИ" else "🧪 SANDBOX P2P DUEL LOBBY",
                         color = Color(0xFF00FF66),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Black,
@@ -116,7 +116,7 @@ fun P2pDuelLobbyScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = if (lang == "ru") "Беспроводной поиск соперников и обмен картами" else "Mesh network player search & encrypted trade",
+                        text = if (lang == "ru") "Локальный симулятор ботов и тестового обмена" else "Local bot sparring & simulated trade sandbox",
                         color = Color.Gray,
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
@@ -172,7 +172,7 @@ fun P2pDuelLobbyScreen(
                         .background(Color(0xFF00FF66))
                 )
                 Text(
-                    text = if (lang == "ru") "Шлюз P2P Mesh активен • Найдено узлов: ${discoveredNodes.size}" else "P2P Mesh Gateway active • Discovered nodes: ${discoveredNodes.size}",
+                    text = if (lang == "ru") "Режим Песочницы: ${discoveredNodes.size} локальных ботов" else "Sandbox Mode: ${discoveredNodes.size} simulated bots",
                     color = Color.White,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace
@@ -341,7 +341,7 @@ fun P2pDuelLobbyScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = if (lang == "ru") "P2P ОБМЕН АРКАНАМИ" else "P2P ARCANA TRADE",
+                        text = if (lang == "ru") "🧪 SANDBOX-ОБМЕН" else "🧪 SANDBOX TRADE SIM",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.Monospace,
@@ -349,13 +349,13 @@ fun P2pDuelLobbyScreen(
                     )
 
                     Text(
-                        text = if (lang == "ru") "Прямой обмен зашифрованным блоком с узлом ${node.name}." else "Direct encrypted ledger swap with node ${node.name}.",
+                        text = if (lang == "ru") "Локальная симуляция сделки с ботом ${node.name}. Реальные карты и токены не списываются." else "Simulated local trade preview with bot ${node.name}. Real vault cards and WEED are untouched.",
                         fontSize = 11.sp,
                         color = Color.White
                     )
 
                     Text(
-                        text = "SHA-256 Block Signature: SIG_P2P_${node.id}_${System.currentTimeMillis() % 100000}",
+                        text = "Sandbox ID: SIM_${node.id}_${System.currentTimeMillis() % 100000}",
                         fontSize = 9.sp,
                         color = Color.Gray,
                         fontFamily = FontFamily.Monospace
@@ -371,12 +371,12 @@ fun P2pDuelLobbyScreen(
                         Button(
                             onClick = {
                                 CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.SUCCESS_CHIME)
-                                tradeSuccessMessage = if (lang == "ru") "✓ Сделка с ${node.name} успешно подписана и добавлена в P2P Ledger!" else "✓ Trade with ${node.name} signed into P2P Ledger!"
+                                tradeSuccessMessage = if (lang == "ru") "🧪 [SANDBOX] Тестовый обмен с ${node.name} записан в симулятор!" else "🧪 [SANDBOX] Simulated trade with ${node.name} recorded!"
                                 selectedNodeForTrade = null
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF66))
                         ) {
-                            Text(if (lang == "ru") "Подписать обмен" else "Sign Trade", color = Color.Black, fontWeight = FontWeight.Bold)
+                            Text(if (lang == "ru") "Симулировать" else "Simulate Trade", color = Color.Black, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

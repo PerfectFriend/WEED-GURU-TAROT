@@ -90,35 +90,23 @@ object CyberNoirSynthPlayer {
                 // Use a stable buffer size
                 val bufferSize = (minBufferSize * 2).coerceAtLeast(2048)
 
-                audioTrack = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    AudioTrack.Builder()
-                        .setAudioAttributes(
-                            AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_MEDIA)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                                .build()
-                        )
-                        .setAudioFormat(
-                            AudioFormat.Builder()
-                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                                .setSampleRate(SAMPLE_RATE)
-                                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                                .build()
-                        )
-                        .setBufferSizeInBytes(bufferSize)
-                        .setTransferMode(AudioTrack.MODE_STREAM)
-                        .build()
-                } else {
-                    @Suppress("DEPRECATION")
-                    AudioTrack(
-                        AudioManager.STREAM_MUSIC,
-                        SAMPLE_RATE,
-                        AudioFormat.CHANNEL_OUT_MONO,
-                        AudioFormat.ENCODING_PCM_16BIT,
-                        bufferSize,
-                        AudioTrack.MODE_STREAM
+                audioTrack = AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build()
                     )
-                }
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(SAMPLE_RATE)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(bufferSize)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
 
                 audioTrack.play()
 

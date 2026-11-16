@@ -1,6 +1,9 @@
 package com.example.data
 
+import android.content.Context
 import com.example.BuildConfig
+import com.example.ui.util.AvatarGenerator
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -9,26 +12,26 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.Proxy
-import java.net.InetSocketAddress
-import java.util.concurrent.TimeUnit
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.LinearGradient
-import android.graphics.Shader
-import android.graphics.Path
-import android.graphics.Rect
-import android.graphics.Typeface
-import java.io.FileOutputStream
 import java.io.File
-import android.content.Context
-import android.graphics.Color as AndroidColor
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.util.concurrent.TimeUnit
 
 object GeminiService {
 
-    private const val MODEL_NAME = "gemini-3.5-flash"
-    private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/$MODEL_NAME:generateContent"
+    private const val DEFAULT_MODEL_NAME = "gemini-2.5-flash"
+
+    @Volatile
+    private var configuredModelName: String = DEFAULT_MODEL_NAME
+
+    fun configureModel(modelName: String) {
+        if (modelName.isNotBlank()) {
+            configuredModelName = modelName.trim()
+        }
+    }
+
+    internal fun buildEndpointUrl(modelName: String = configuredModelName): String =
+        "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent"
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(45, TimeUnit.SECONDS)
@@ -36,29 +39,121 @@ object GeminiService {
         .writeTimeout(45, TimeUnit.SECONDS)
         .build()
 
+    private fun resolveConfiguredApiKey(): String? {
+        val raw = BuildConfig.GEMINI_API_KEY
+        if (raw.isBlank() || raw == "MY_GEMINI_API_KEY" || raw.contains("placeholder", ignoreCase = true)) {
+            return null
+        }
+        return raw
+    }
+
+    private fun buildClient(
+        proxyType: String = "NONE",
+        proxyHost: String = "127.0.0.1",
+        proxyPort: Int = 9050,
+        isProxyActive: Boolean = false
+    ): OkHttpClient {
+        if (!isProxyActive || proxyType == "NONE") return client
+        val pType = if (proxyType.uppercase() == "HTTP") Proxy.Type.HTTP else Proxy.Type.SOCKS
+        // Fail closed when user enabled proxy so client IP never leaks on direct fallback (M5)
+        val address = InetSocketAddress(proxyHost, proxyPort)
+        return client.newBuilder()
+            .proxy(Proxy(pType, address))
+            .build()
+    }
+
+    internal suspend fun executeGeminiCall(
+        apiKey: String,
+        userPrompt: String,
+        systemPrompt: String? = null,
+        temperature: Double = 0.7,
+        httpClient: OkHttpClient = client
+    ): String? {
+        val rootJson = JSONObject().apply {
+            put("contents", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("parts", JSONArray().apply {
+                        put(JSONObject().apply { put("text", userPrompt) })
+                    })
+                })
+            })
+            if (!systemPrompt.isNullOrBlank()) {
+                put("systemInstruction", JSONObject().apply {
+                    put("parts", JSONArray().apply {
+                        put(JSONObject().apply { put("text", systemPrompt) })
+                    })
+                })
+            }
+            put("generationConfig", JSONObject().apply {
+                put("temperature", temperature)
+            })
+        }
+
+        val requestBody = rootJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+        val request = Request.Builder()
+            .url(buildEndpointUrl())
+            .addHeader("x-goog-api-key", apiKey)
+            .post(requestBody)
+            .build()
+
+        val retryDelaysMs = longArrayOf(400L, 1000L)
+        for (attempt in 0..retryDelaysMs.size) {
+            try {
+                httpClient.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val responseBody = response.body?.string() ?: return null
+                        val responseJson = JSONObject(responseBody)
+                        return responseJson.optJSONArray("candidates")
+                            ?.optJSONObject(0)
+                            ?.optJSONObject("content")
+                            ?.optJSONArray("parts")
+                            ?.optJSONObject(0)
+                            ?.optString("text")
+                            ?.takeIf { it.isNotBlank() }
+                    }
+                    val retryable = response.code == 429 || response.code >= 500
+                    if (!retryable || attempt == retryDelaysMs.size) {
+                        return null
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: java.io.IOException) {
+                if (attempt == retryDelaysMs.size) return null
+            }
+            kotlinx.coroutines.delay(retryDelaysMs[attempt])
+        }
+        return null
+    }
+
+    private fun stripMarkdownCodeFences(raw: String): String {
+        var cleaned = raw.trim()
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.removePrefix("```json")
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.removePrefix("```")
+        }
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.removeSuffix("```")
+        }
+        return cleaned.trim()
+    }
+
     /**
      * Decodes and reads a spread of drawn cards using the Gemini API.
-     * If the API Key is unconfigured, or the network fails, it falls back to a high-fidelity local generator.
+     * Falls back to the local cyberpunk diagnostic generator when offline or unconfigured.
      */
     suspend fun decodeTarotMatrix(
         userQuestion: String,
-        drawnCards: List<Pair<CyberTarotCard, Boolean>>, // Pair of Card and IsUpright
+        drawnCards: List<Pair<CyberTarotCard, Boolean>>,
         systemLanguage: String = "en",
         proxyType: String = "NONE",
         proxyHost: String = "127.0.0.1",
         proxyPort: Int = 9050,
         isProxyActive: Boolean = false
     ): String = withContext(Dispatchers.IO) {
-        val rawApiKey = BuildConfig.GEMINI_API_KEY
-        
-        // Clean up api key checking
-        val isApiKeyInvalid = rawApiKey.isBlank() || 
-                              rawApiKey == "MY_GEMINI_API_KEY" || 
-                              rawApiKey.contains("placeholder", ignoreCase = true)
-
-        if (isApiKeyInvalid) {
-            return@withContext generateLocalCyberInterpretation(userQuestion, drawnCards, systemLanguage)
-        }
+        val apiKey = resolveConfiguredApiKey()
+            ?: return@withContext generateLocalCyberInterpretation(userQuestion, drawnCards, systemLanguage)
 
         try {
             val langName = when (systemLanguage) {
@@ -72,21 +167,20 @@ object GeminiService {
                 else -> "English"
             }
 
+            // Keep untrusted user query out of systemInstruction (M5)
             val systemPrompt = """
                 You are the Cyber Tarot Matrix Decoder. An expert system designed to interpret a futuristic cybernetic fork of traditional Rider-Waite symbolism.
                 The cards drawn represent nodes in the user's current computational life-path, incorporating digital circuitry elements, neon aesthetics, and cybersecurity concepts.
-                
-                IMPORTANT: You MUST write the entire decryption report, headings, analysis, advice, and recommendations in the language: $langName. 
+
+                IMPORTANT: You MUST write the entire decryption report, headings, analysis, advice, and recommendations in the language: $langName.
                 Do not write in English unless requested. The user is communicating in $langName. Keep the cyberpunk vocabulary appropriate to $langName.
-                
-                Analyze the drawn cards in relation to the user's query: "$userQuestion"
-                
-                For each card, elaborate on:
+
+                For each card in the user prompt, elaborate on:
                 - How its futuristic representation (e.g. "The Glitch" for "The Fool", "The SysAdmin" for "The Emperor") maps to their situation.
                 - The meaning of its digital circuitry analogies (e.g. Volatile RAM, Hardware Firewalls, JTAG Debuggers) relative to their path.
                 - Practical guidance formatted in a professional cyber-themed style (use words like compile, buffer, bandwidth, firewall, decrypt, protocol).
-                
-                Keep your output beautifully organized, formatting with clean headings, markdown, and clear separation of cards. Wrap with an introductory transmission sync and a final 'Consensus Recommendation' from the Core Processor.
+
+                Keep your output beautifully organized with clean headings, markdown, and clear separation of cards. Wrap with an introductory transmission sync and a final 'Consensus Recommendation' from the Core Processor.
             """.trimIndent()
 
             val cardDrawsDescription = drawnCards.joinToString("\n") { (card, isUpright) ->
@@ -95,101 +189,38 @@ object GeminiService {
                 val desc = CardLocalizationHelper.getLocalizedDescription(card.index, systemLanguage)
                 val analogy = CardLocalizationHelper.getLocalizedCircuitryElement(card.index, systemLanguage)
                 val meaning = CardLocalizationHelper.getLocalizedCyberMeaning(card.index, systemLanguage)
-                val advice = if (isUpright) CardLocalizationHelper.getLocalizedUprightAdvice(card.index, systemLanguage) else CardLocalizationHelper.getLocalizedReversedAdvice(card.index, systemLanguage)
-                
+                val advice = if (isUpright) {
+                    CardLocalizationHelper.getLocalizedUprightAdvice(card.index, systemLanguage)
+                } else {
+                    CardLocalizationHelper.getLocalizedReversedAdvice(card.index, systemLanguage)
+                }
                 "- Card: $cardName (${if (isUpright) "UPRIGHT" else "REVERSED"}). Represents: $tradName. Rarity: ${card.defaultRarity}. Circuit Analogy: $analogy. Summary: $desc. Meaning: $meaning. Advice: $advice"
             }
 
             val userPrompt = """
                 Query from user terminal: "$userQuestion"
-                
+
                 Drawn Nodes:
                 $cardDrawsDescription
-                
+
                 Generate the decryption report:
             """.trimIndent()
 
-            // Construct JSON request manually to avoid serialization library mismatches
-            val rootJson = JSONObject().apply {
-                val contentsArray = JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().apply {
-                                put("text", userPrompt)
-                            })
-                        })
-                    })
-                }
-                put("contents", contentsArray)
-
-                val systemInstructionJson = JSONObject().apply {
-                    put("parts", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("text", systemPrompt)
-                        })
-                    })
-                }
-                put("systemInstruction", systemInstructionJson)
-
-                val genConfig = JSONObject().apply {
-                    put("temperature", 0.7)
-                }
-                put("generationConfig", genConfig)
-            }
-
-            val mediaType = "application/json; charset=utf-8".toMediaType()
-            val requestBody = rootJson.toString().toRequestBody(mediaType)
-            val url = "$BASE_URL?key=$rawApiKey"
-
-            val request = Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build()
-
-            val currentClient = if (isProxyActive && proxyType != "NONE") {
-                val pType = if (proxyType.uppercase() == "HTTP") Proxy.Type.HTTP else Proxy.Type.SOCKS
-                try {
-                    val address = InetSocketAddress(proxyHost, proxyPort)
-                    client.newBuilder()
-                        .proxy(Proxy(pType, address))
-                        .build()
-                } catch (e: Exception) {
-                    client
-                }
-            } else {
-                client
-            }
-
-            currentClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext "Transmission Error (Code ${response.code}). Falling back to local diagnostic core:\n\n" +
-                            generateLocalCyberInterpretation(userQuestion, drawnCards, systemLanguage)
-                }
-
-                val responseBody = response.body?.string() ?: throw Exception("Empty response body")
-                val responseJson = JSONObject(responseBody)
-                
-                val candidates = responseJson.optJSONArray("candidates")
-                val firstCandidate = candidates?.optJSONObject(0)
-                val content = firstCandidate?.optJSONObject("content")
-                val parts = content?.optJSONArray("parts")
-                val text = parts?.optJSONObject(0)?.optString("text")
-
-                if (!text.isNullOrBlank()) {
-                    text
-                } else {
-                    generateLocalCyberInterpretation(userQuestion, drawnCards, systemLanguage)
-                }
-            }
-        } catch (e: Exception) {
-            "Network latency/packet loss detected. Switched to offline backup core:\n\n" +
-                    generateLocalCyberInterpretation(userQuestion, drawnCards, systemLanguage)
+            val configuredClient = buildClient(proxyType, proxyHost, proxyPort, isProxyActive)
+            executeGeminiCall(
+                apiKey = apiKey,
+                userPrompt = userPrompt,
+                systemPrompt = systemPrompt,
+                temperature = 0.7,
+                httpClient = configuredClient
+            ) ?: generateLocalCyberInterpretation(userQuestion, drawnCards, systemLanguage)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            generateLocalCyberInterpretation(userQuestion, drawnCards, systemLanguage)
         }
     }
 
-    /**
-     * High-fidelity offline generator that perfectly simulates a highly-thematic Cyberpunk interpretation.
-     */
     private fun generateLocalCyberInterpretation(
         userQuestion: String,
         drawnCards: List<Pair<CyberTarotCard, Boolean>>,
@@ -339,7 +370,7 @@ object GeminiService {
                 "optimal" to "सक्रिय ग्रिड से प्राप्त डेटा पैकेट के आधार पर, इष्टतम मार्ग है ",
                 "one_upright" to "आपके संचार बफ़र्स साफ हैं और सिस्टम हीट कम है। सीधे निष्पादन के साथ आगे बढ़ें।",
                 "one_reversed" to "आगे मेमोरी आवंटित करने से पहले स्थानीय कंपाइलर त्रुटियों को हल करें और अनऑप्टिमाइज़्ड लूप को रोकें।",
-                "all_upright" to "पूर्ण पैमाने पर पाइपलाइन रोलआउट निष्पादित करें。आपके नोड्स असाधारण संरेखण प्रदर्शित करते हैं。",
+                "all_upright" to "पूर्ण पैमाने पर पाइपलाइन रोलआउट निष्पादित करें। आपके नोड्स असाधारण संरेखण प्रदर्शित करते हैं।",
                 "all_reversed" to "आपातकालीन सुरक्षित-मोड रीबूट शुरू करें। प्रत्येक नोड सिग्नल ब्लॉक या बफर ओवरलोड को दर्शाता है।",
                 "balanced" to "एक लोड-संतुलित प्रवाह को अपनाएं। जबकि कुछ मॉड्यूल पूरी तरह से अनुकूलित हैं, अन्य को रिफैक्टरिंग की आवश्यकता है।"
             )
@@ -377,8 +408,12 @@ object GeminiService {
             val localizedDesc = CardLocalizationHelper.getLocalizedDescription(card.index, systemLanguage)
             val localizedAnalogy = CardLocalizationHelper.getLocalizedCircuitryElement(card.index, systemLanguage)
             val localizedMeaning = CardLocalizationHelper.getLocalizedCyberMeaning(card.index, systemLanguage)
-            val localizedAdvice = if (isUpright) CardLocalizationHelper.getLocalizedUprightAdvice(card.index, systemLanguage) else CardLocalizationHelper.getLocalizedReversedAdvice(card.index, systemLanguage)
-            
+            val localizedAdvice = if (isUpright) {
+                CardLocalizationHelper.getLocalizedUprightAdvice(card.index, systemLanguage)
+            } else {
+                CardLocalizationHelper.getLocalizedReversedAdvice(card.index, systemLanguage)
+            }
+
             val alignment = if (isUpright) strings["upright"] else strings["reversed"]
             sb.append("### ${strings["node"]} ${idx + 1}: $localizedName ($alignment)\n")
             sb.append("*${strings["equivalent"]}:* **$localizedTraditional** | *${strings["rarity"]}:* **${card.defaultRarity}**\n\n")
@@ -386,7 +421,7 @@ object GeminiService {
             sb.append("**${strings["symbolism"]}:** $localizedDesc\n\n")
             sb.append("**${strings["meaning"]}:** $localizedMeaning\n\n")
             sb.append("**${strings["guidance"]}:** $localizedAdvice\n\n")
-            
+
             val keywords = if (isUpright) card.uprightKeywords.joinToString(" • ") else card.reversedKeywords.joinToString(" • ")
             sb.append("**${strings["keywords"]}:** $keywords\n\n")
             sb.append("---\n\n")
@@ -394,8 +429,7 @@ object GeminiService {
 
         sb.append(strings["recommendation"]).append("\n")
         sb.append(strings["optimal"])
-        
-        // Dynamic summary generator
+
         if (drawnCards.size == 1) {
             val (c, upright) = drawnCards[0]
             val cardName = CardLocalizationHelper.getLocalizedName(c.index, systemLanguage)
@@ -403,233 +437,109 @@ object GeminiService {
             sb.append(if (upright) strings["one_upright"] else strings["one_reversed"])
         } else {
             val balanceCount = drawnCards.count { it.second }
-            if (balanceCount == drawnCards.size) {
-                sb.append(strings["all_upright"])
-            } else if (balanceCount == 0) {
-                sb.append(strings["all_reversed"])
-            } else {
-                sb.append(strings["balanced"])
+            when (balanceCount) {
+                drawnCards.size -> sb.append(strings["all_upright"])
+                0 -> sb.append(strings["all_reversed"])
+                else -> sb.append(strings["balanced"])
             }
         }
-        
+
         return sb.toString()
     }
 
-    /**
-     * Generates a contextual, highly-thematic Cyberpunk response from a specific contact persona.
-     */
     suspend fun generatePeerResponse(
         peerName: String,
         peerOnion: String,
         userMessage: String,
-        chatHistory: List<Pair<String, String>> // List of Pair(senderName, messageText)
+        chatHistory: List<Pair<String, String>>
     ): String = withContext(Dispatchers.IO) {
-        val rawApiKey = BuildConfig.GEMINI_API_KEY
-        val isApiKeyInvalid = rawApiKey.isBlank() || 
-                              rawApiKey == "MY_GEMINI_API_KEY" || 
-                              rawApiKey.contains("placeholder", ignoreCase = true)
-
-        if (isApiKeyInvalid) {
-            return@withContext generateLocalMockPeerResponse(peerName, userMessage)
-        }
+        val apiKey = resolveConfiguredApiKey()
+            ?: return@withContext generateLocalMockPeerResponse(peerName, userMessage)
 
         try {
             val systemPrompt = """
-                You are a simulated remote cyberpunk operator in a peer-to-peer darknet network.
-                Your name is "$peerName" (routing node: "$peerOnion").
-                
+                You are a simulated remote cyberpunk operator in a local sandbox network.
+                Your name is "$peerName" (sandbox node: "$peerOnion").
+
                 Respond to the user's message as this character. Keep your reply concise (1-3 sentences maximum).
                 Use futuristic cyberpunk terminology (e.g. mainframe, grid, encryption, node, bandwidth, terminal, proxy, breach, protocols).
-                Maintain a highly specialized hackers' tone depending on your persona:
-                - If your name is "Cipher_Alpha", you are an elitist cryptographer, precise, slightly mysterious, obsessed with perfect encryption.
-                - If your name is "Proxy_Net", you are a fast-talking data broker, focused on credits, assets, speed, and grid connectivity.
-                - For other names, be a standard darknet runner, professional, cautious, and helpful.
-                
-                Never break character. Never mention you are an AI model or a chatbot. Keep the response fully immersive.
+                Maintain a hacker tone depending on your persona:
+                - If your name is "Cipher_Alpha", be a precise, mysterious cryptographer focused on encryption.
+                - If your name is "Proxy_Net", be a fast-talking data broker focused on credits and routing.
+                - For other names, be a cautious, helpful operator.
+
+                Never break character. Never mention you are an AI model.
             """.trimIndent()
 
-            val historyString = chatHistory.joinToString("\n") { (sender, text) ->
-                "$sender: $text"
-            }
-
+            val historyString = chatHistory.joinToString("\n") { (sender, text) -> "$sender: $text" }
             val userPrompt = """
                 Chat history:
                 $historyString
-                
+
                 $peerName, generate your next direct response to the user's last message:
             """.trimIndent()
 
-            val rootJson = JSONObject().apply {
-                val contentsArray = JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().apply {
-                                put("text", userPrompt)
-                            })
-                        })
-                    })
-                }
-                put("contents", contentsArray)
-
-                val systemInstructionJson = JSONObject().apply {
-                    put("parts", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("text", systemPrompt)
-                        })
-                    })
-                }
-                put("systemInstruction", systemInstructionJson)
-
-                val genConfig = JSONObject().apply {
-                    put("temperature", 0.8)
-                }
-                put("generationConfig", genConfig)
-            }
-
-            val mediaType = "application/json; charset=utf-8".toMediaType()
-            val requestBody = rootJson.toString().toRequestBody(mediaType)
-            val url = "$BASE_URL?key=$rawApiKey"
-
-            val request = Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext generateLocalMockPeerResponse(peerName, userMessage)
-                }
-
-                val responseBody = response.body?.string() ?: throw Exception("Empty response body")
-                val responseJson = JSONObject(responseBody)
-                val candidates = responseJson.optJSONArray("candidates")
-                val text = candidates?.optJSONObject(0)
-                    ?.optJSONObject("content")
-                    ?.optJSONArray("parts")
-                    ?.optJSONObject(0)
-                    ?.optString("text")
-
-                if (!text.isNullOrBlank()) {
-                    text.trim()
-                } else {
-                    generateLocalMockPeerResponse(peerName, userMessage)
-                }
-            }
-        } catch (e: Exception) {
+            executeGeminiCall(
+                apiKey = apiKey,
+                userPrompt = userPrompt,
+                systemPrompt = systemPrompt,
+                temperature = 0.8
+            )?.trim() ?: generateLocalMockPeerResponse(peerName, userMessage)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
             generateLocalMockPeerResponse(peerName, userMessage)
         }
     }
 
     private fun generateLocalMockPeerResponse(peerName: String, userMessage: String): String {
         return when {
-            userMessage.contains("hello", ignoreCase = true) || userMessage.contains("hi", ignoreCase = true) -> {
-                "[$peerName]: Handshake successful. End-to-end encrypted tunnels are stable."
-            }
-            userMessage.contains("tarot", ignoreCase = true) || userMessage.contains("draw", ignoreCase = true) -> {
-                "[$peerName]: Divination telemetry synced. Send a P2P credit transfer to trade decrypted cards."
-            }
-            userMessage.contains("key", ignoreCase = true) || userMessage.contains("crypto", ignoreCase = true) -> {
-                "[$peerName]: Symmetric key updated. Keep your local hardware private keys safe."
-            }
-            userMessage.contains("bridge", ignoreCase = true) || userMessage.contains("tor", ignoreCase = true) -> {
-                "[$peerName]: Bridges active. I am currently routing traffic over obfs4 bridges."
-            }
-            else -> {
-                "[$peerName]: Telemetry packet received. Hash matching verified. Signal strong."
-            }
+            userMessage.contains("hello", ignoreCase = true) || userMessage.contains("hi", ignoreCase = true) ->
+                "[$peerName]: Handshake successful. Encrypted local channel active."
+            userMessage.contains("tarot", ignoreCase = true) || userMessage.contains("draw", ignoreCase = true) ->
+                "[$peerName]: Divination telemetry synced. Sandbox ledger online."
+            userMessage.contains("key", ignoreCase = true) || userMessage.contains("crypto", ignoreCase = true) ->
+                "[$peerName]: ECDH key verification intact. Keep local keys secure."
+            userMessage.contains("bridge", ignoreCase = true) || userMessage.contains("tor", ignoreCase = true) ->
+                "[$peerName]: Proxy gateway telemetry checked."
+            else ->
+                "[$peerName]: Telemetry packet received. Hash matching verified."
         }
     }
 
-    /**
-     * Generates a stylized cyberpunk advertisement banner's title and description from a prompt.
-     * Falls back to a local thematic generator if unconfigured or offline.
-     */
     suspend fun generateAdBannerContent(prompt: String): Pair<String, String> = withContext(Dispatchers.IO) {
-        val rawApiKey = BuildConfig.GEMINI_API_KEY
-        val isApiKeyInvalid = rawApiKey.isBlank() || 
-                              rawApiKey == "MY_GEMINI_API_KEY" || 
-                              rawApiKey.contains("placeholder", ignoreCase = true)
-
-        if (isApiKeyInvalid) {
-            return@withContext generateLocalAdBannerContent(prompt)
-        }
+        val apiKey = resolveConfiguredApiKey()
+            ?: return@withContext generateLocalAdBannerContent(prompt)
 
         try {
             val systemPrompt = """
-                You are a neural marketing terminal of the Cyber Tarot network. Your task is to transform a simple user-supplied prompt into a striking, short, highly stylized cyberpunk/sci-fi advertisement banner.
-                
-                You must return exactly TWO lines of text (no more, no less, no headings, no markdown, no quotes):
-                Line 1: A brief, punchy, catchy TITLE of 2 to 4 words, in ALL CAPS.
-                Line 2: A sleek, alluring, futuristic TAGLINE of exactly 1 sentence (max 15 words) describing the service or product.
-                
-                Use high-tech sci-fi terms (e.g. quantum, neural, proxy, blockchain, neon, bios, cyberdeck, uplink).
-                Translate the output language to match the input prompt's language (e.g., if the user prompt is in Russian, output both lines in Russian. If Spanish, output in Spanish, etc.).
+                You are a neural marketing terminal of the Cyber Tarot network. Transform the user-supplied prompt into a stylized cyberpunk advertisement banner.
+
+                Return exactly TWO lines of text (no headings, no markdown, no quotes):
+                Line 1: A brief, punchy TITLE of 2 to 4 words, in ALL CAPS.
+                Line 2: A futuristic TAGLINE of exactly 1 sentence (max 15 words).
+
+                Match the language of the input prompt.
             """.trimIndent()
 
-            val rootJson = JSONObject().apply {
-                val contentsArray = JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().apply {
-                                put("text", "User Prompt: $prompt")
-                            })
-                        })
-                    })
-                }
-                put("contents", contentsArray)
-
-                val systemInstructionJson = JSONObject().apply {
-                    put("parts", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("text", systemPrompt)
-                        })
-                    })
-                }
-                put("systemInstruction", systemInstructionJson)
-
-                val genConfig = JSONObject().apply {
-                    put("temperature", 0.8)
-                }
-                put("generationConfig", genConfig)
-            }
-
-            val mediaType = "application/json; charset=utf-8".toMediaType()
-            val requestBody = rootJson.toString().toRequestBody(mediaType)
-            val url = "$BASE_URL?key=$rawApiKey"
-
-            val request = Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext generateLocalAdBannerContent(prompt)
-                }
-
-                val responseBody = response.body?.string() ?: throw Exception("Empty body")
-                val responseJson = JSONObject(responseBody)
-                val candidates = responseJson.optJSONArray("candidates")
-                val text = candidates?.optJSONObject(0)
-                    ?.optJSONObject("content")
-                    ?.optJSONArray("parts")
-                    ?.optJSONObject(0)
-                    ?.optString("text")
-
-                if (!text.isNullOrBlank()) {
-                    val lines = text.trim().lines().filter { it.isNotBlank() }
-                    if (lines.size >= 2) {
-                        val title = lines[0].trim().replace("\"", "").uppercase()
-                        val tagline = lines[1].trim().replace("\"", "")
-                        Pair(title, tagline)
-                    } else {
-                        generateLocalAdBannerContent(prompt)
-                    }
-                } else {
-                    generateLocalAdBannerContent(prompt)
+            val text = executeGeminiCall(
+                apiKey = apiKey,
+                userPrompt = "User Prompt: $prompt",
+                systemPrompt = systemPrompt,
+                temperature = 0.8
+            )
+            if (!text.isNullOrBlank()) {
+                val lines = text.trim().lines().filter { it.isNotBlank() }
+                if (lines.size >= 2) {
+                    val title = lines[0].trim().replace("\"", "").uppercase()
+                    val tagline = lines[1].trim().replace("\"", "")
+                    return@withContext Pair(title, tagline)
                 }
             }
-        } catch (e: Exception) {
+            generateLocalAdBannerContent(prompt)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
             generateLocalAdBannerContent(prompt)
         }
     }
@@ -637,437 +547,87 @@ object GeminiService {
     private fun generateLocalAdBannerContent(prompt: String): Pair<String, String> {
         val cleaned = prompt.trim().lowercase()
         return when {
-            cleaned.contains("hack") || cleaned.contains("декрипт") || cleaned.contains("взлом") -> {
+            cleaned.contains("hack") || cleaned.contains("декрипт") || cleaned.contains("взлом") ->
                 Pair("NEURAL BREACH TERMINAL", "Bypass level-5 hardware firewalls and access locked matrix archives instantly.")
-            }
-            cleaned.contains("имплант") || cleaned.contains("chrome") || cleaned.contains("био") || cleaned.contains("body") -> {
+            cleaned.contains("имплант") || cleaned.contains("chrome") || cleaned.contains("био") || cleaned.contains("body") ->
                 Pair("CHROME VECTORS", "High-frequency cybernetic body upgrades calibrated for seamless neural integration.")
-            }
-            cleaned.contains("money") || cleaned.contains("кредит") || cleaned.contains("swap") || cleaned.contains("finance") -> {
-                Pair("QUANTUM LEDGER MINING", "Earn passive credits inside the main decentralized liquidity node stream.")
-            }
+            cleaned.contains("money") || cleaned.contains("кредит") || cleaned.contains("swap") || cleaned.contains("finance") ->
+                Pair("QUANTUM LEDGER MINING", "Earn passive credits inside the local decentralized simulation node.")
             else -> {
-                // Generates a cool title and description
-                val titleWords = prompt.split(" ").take(3).map { it.uppercase() }
+                val titleWords = prompt.split(" ").filter { it.isNotBlank() }.take(3).map { it.uppercase() }
                 val title = if (titleWords.isNotEmpty()) titleWords.joinToString(" ") else "MAIN CORE BROADCAST"
-                Pair(title, "Optimized by the AI Treasurer: $prompt (Decryption tunnels online).")
+                Pair(title, "Optimized by the Cyber Core: $prompt")
             }
         }
     }
 
     suspend fun generateAvatarSpecification(alias: String, style: String): String = withContext(Dispatchers.IO) {
-        val rawApiKey = BuildConfig.GEMINI_API_KEY
-        val isApiKeyInvalid = rawApiKey.isBlank() || 
-                              rawApiKey == "MY_GEMINI_API_KEY" || 
-                              rawApiKey.contains("placeholder", ignoreCase = true)
-
-        if (isApiKeyInvalid) {
-            return@withContext generateLocalAvatarSpecification(alias, style)
-        }
+        val apiKey = resolveConfiguredApiKey()
+            ?: return@withContext generateLocalAvatarSpecification(alias, style)
 
         try {
             val systemPrompt = """
-                You are the Neural Avatar Compiler v2.4. Your task is to design a stylized cyberpunk visual layout specification based on a user's alias and chosen style.
-                Return ONLY a valid JSON object (no markdown formatting, no backticks, no comments) with the following properties:
-                - primaryColorHex: Hex color code (e.g. "#00FF00" for Matrix, "#FF00FF" for Neon)
-                - secondaryColorHex: Hex color code (e.g. "#003300", "#00FFFF")
-                - backgroundHex: Hex color code (e.g. "#050508")
-                - glyphChar: A single unique futuristic/techno unicode character or symbol (e.g. "⚡", "☯", "⚡", "⌘", "❖", "⎈", "⚛", "☣", "☢", "⚿") representing their neural node.
-                - visualDensity: An integer from 10 to 40 (number of particles/grid lines).
-                - cryptographicHash: A unique 8-character hex string based on their alias.
-                - nodeLabel: A stylized short prefix of their alias (max 6 chars) to render as text inside the avatar.
+                You are the Neural Avatar Compiler v2.4. Design a stylized cyberpunk visual layout specification based on the user prompt's alias and style.
+                Return ONLY a valid JSON object (no markdown formatting, no backticks, no comments) with keys:
+                - primaryColorHex, secondaryColorHex, backgroundHex, glyphChar, visualDensity (10..40), cryptographicHash (8 hex chars), nodeLabel (max 6 chars).
             """.trimIndent()
 
-            val userPrompt = "Alias: $alias, Selected Style: $style"
+            val text = executeGeminiCall(
+                apiKey = apiKey,
+                userPrompt = "Alias: $alias, Selected Style: $style",
+                systemPrompt = systemPrompt,
+                temperature = 0.7
+            ) ?: return@withContext generateLocalAvatarSpecification(alias, style)
 
-            val rootJson = JSONObject().apply {
-                val contentsArray = JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().apply {
-                                put("text", userPrompt)
-                            })
-                        })
-                    })
-                }
-                put("contents", contentsArray)
-
-                val systemInstructionJson = JSONObject().apply {
-                    put("parts", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("text", systemPrompt)
-                        })
-                    })
-                }
-                put("systemInstruction", systemInstructionJson)
-
-                val genConfig = JSONObject().apply {
-                    put("temperature", 0.7)
-                }
-                put("generationConfig", genConfig)
+            val cleaned = stripMarkdownCodeFences(text)
+            if (cleaned.isNotBlank()) {
+                JSONObject(cleaned) // Validate JSON before returning
+                cleaned
+            } else {
+                generateLocalAvatarSpecification(alias, style)
             }
-
-            val mediaType = "application/json; charset=utf-8".toMediaType()
-            val requestBody = rootJson.toString().toRequestBody(mediaType)
-            val url = "$BASE_URL?key=$rawApiKey"
-
-            val request = Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext generateLocalAvatarSpecification(alias, style)
-                val responseBody = response.body?.string() ?: return@withContext generateLocalAvatarSpecification(alias, style)
-                
-                var cleanedResponse = responseBody.trim()
-                if (cleanedResponse.startsWith("```json")) {
-                    cleanedResponse = cleanedResponse.removePrefix("```json")
-                    if (cleanedResponse.endsWith("```")) {
-                        cleanedResponse = cleanedResponse.removeSuffix("```")
-                    }
-                } else if (cleanedResponse.startsWith("```")) {
-                    cleanedResponse = cleanedResponse.removePrefix("```")
-                    if (cleanedResponse.endsWith("```")) {
-                        cleanedResponse = cleanedResponse.removeSuffix("```")
-                    }
-                }
-                cleanedResponse = cleanedResponse.trim()
-                
-                val json = JSONObject(cleanedResponse)
-                val candidates = json.optJSONArray("candidates")
-                val text = candidates?.optJSONObject(0)
-                    ?.optJSONObject("content")
-                    ?.optJSONArray("parts")
-                    ?.optJSONObject(0)
-                    ?.optString("text")
-
-                var finalCleaned = text?.trim() ?: ""
-                if (finalCleaned.startsWith("```json")) {
-                    finalCleaned = finalCleaned.removePrefix("```json")
-                    if (finalCleaned.endsWith("```")) {
-                        finalCleaned = finalCleaned.removeSuffix("```")
-                    }
-                } else if (finalCleaned.startsWith("```")) {
-                    finalCleaned = finalCleaned.removePrefix("```")
-                    if (finalCleaned.endsWith("```")) {
-                        finalCleaned = finalCleaned.removeSuffix("```")
-                    }
-                }
-                finalCleaned = finalCleaned.trim()
-
-                if (finalCleaned.isNotBlank()) {
-                    JSONObject(finalCleaned)
-                    finalCleaned
-                } else {
-                    generateLocalAvatarSpecification(alias, style)
-                }
-            }
-        } catch (e: Exception) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
             generateLocalAvatarSpecification(alias, style)
         }
     }
 
-    fun generateLocalAvatarSpecification(alias: String, style: String): String {
-        val hash = alias.hashCode().coerceAtLeast(0)
-        val shortLabel = alias.take(6).uppercase()
-        val cryptoHash = Integer.toHexString(hash).take(8).padStart(8, '0').uppercase()
-        
-        val specs = when (style.lowercase()) {
-            "matrix", "matrix rain" -> {
-                val glyphs = listOf("⎈", "⚡", "⌗", "⌬", "⌌", "⌎", "⍝")
-                val selectedGlyph = glyphs[hash % glyphs.size]
-                AvatarSpecs("#00FF66", "#003311", "#050A05", selectedGlyph, 25)
-            }
-            "neon", "neon synthwave" -> {
-                val glyphs = listOf("☼", "❖", "⚡", "◆", "▲", "▼", "◄")
-                val selectedGlyph = glyphs[hash % glyphs.size]
-                AvatarSpecs("#FF007F", "#8B008B", "#0C020E", selectedGlyph, 30)
-            }
-            "neural", "neural synapses" -> {
-                val glyphs = listOf("⬢", "⌬", "⚛", "⎉", "⎊", "⎋")
-                val selectedGlyph = glyphs[hash % glyphs.size]
-                AvatarSpecs("#00F0FF", "#004080", "#030810", selectedGlyph, 20)
-            }
-            "quantum", "quantum singularity" -> {
-                val glyphs = listOf("⚙", "❂", "☉", "⊚", "⊛", "⊜")
-                val selectedGlyph = glyphs[hash % glyphs.size]
-                AvatarSpecs("#7A22FF", "#2E0854", "#04010A", selectedGlyph, 35)
-            }
-            else -> { // Arcade / Cybernetic Glyph
-                val glyphs = listOf("⌘", "☯", "✖", "★", "✴", "✷", "✸")
-                val selectedGlyph = glyphs[hash % glyphs.size]
-                AvatarSpecs("#FFCC00", "#663300", "#0A0602", selectedGlyph, 15)
-            }
-        }
-        
-        return """
-            {
-                "primaryColorHex": "${specs.primary}",
-                "secondaryColorHex": "${specs.secondary}",
-                "backgroundHex": "${specs.bg}",
-                "glyphChar": "${specs.glyph}",
-                "visualDensity": ${specs.density},
-                "cryptographicHash": "$cryptoHash",
-                "nodeLabel": "$shortLabel"
-            }
-        """.trimIndent()
-    }
-
-    data class AvatarSpecs(val primary: String, val secondary: String, val bg: String, val glyph: String, val density: Int)
+    fun generateLocalAvatarSpecification(alias: String, style: String): String =
+        AvatarGenerator.generateLocalAvatarSpecification(alias, style)
 
     fun renderAvatarToBitmap(
         context: Context,
         alias: String,
         avatarStyle: String,
         specJson: String
-    ): File? {
-        try {
-            val width = 256
-            val height = 256
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            
-            val json = try {
-                if (specJson.isBlank()) {
-                    JSONObject(generateLocalAvatarSpecification(alias, avatarStyle))
-                } else {
-                    JSONObject(specJson)
-                }
-            } catch (e: Exception) {
-                JSONObject(generateLocalAvatarSpecification(alias, avatarStyle))
-            }
-            
-            val primaryColor = AndroidColor.parseColor(json.optString("primaryColorHex", "#00FF00"))
-            val secondaryColor = AndroidColor.parseColor(json.optString("secondaryColorHex", "#003300"))
-            val bgColor = AndroidColor.parseColor(json.optString("backgroundHex", "#050508"))
-            val glyphChar = json.optString("glyphChar", "⌘")
-            val density = json.optInt("visualDensity", 20)
-            val cryptoHash = json.optString("cryptographicHash", "88888888")
-            val nodeLabel = json.optString("nodeLabel", alias.take(6).uppercase())
-            
-            val bgPaint = Paint().apply {
-                color = bgColor
-                style = Paint.Style.FILL
-            }
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
-            
-            val linePaint = Paint().apply {
-                color = primaryColor
-                strokeWidth = 1.2f
-                style = Paint.Style.STROKE
-                alpha = 40
-            }
-            
-            val hash = alias.hashCode().coerceAtLeast(0)
-            val random = java.util.Random(hash.toLong())
-            
-            when (avatarStyle.lowercase()) {
-                "matrix", "matrix rain" -> {
-                    val textPaint = Paint().apply {
-                        color = primaryColor
-                        textSize = 10f
-                        typeface = Typeface.MONOSPACE
-                        alpha = 100
-                    }
-                    for (i in 0 until density) {
-                        val x = random.nextInt(width).toFloat()
-                        val y = random.nextInt(height).toFloat()
-                        val binary = if (random.nextBoolean()) "1" else "0"
-                        canvas.drawText(binary, x, y, textPaint)
-                        canvas.drawText(binary, x, (y + 15) % height, textPaint)
-                        canvas.drawText(binary, x, (y + 30) % height, textPaint)
-                    }
-                }
-                "neon", "neon synthwave" -> {
-                    val sunPaint = Paint().apply {
-                        isAntiAlias = true
-                        shader = LinearGradient(
-                            0f, height * 0.2f, 0f, height * 0.7f,
-                            primaryColor, secondaryColor, Shader.TileMode.CLAMP
-                        )
-                    }
-                    canvas.drawCircle(width / 2f, height / 2f, 70f, sunPaint)
-                    
-                    val cutPaint = Paint().apply {
-                        color = bgColor
-                        style = Paint.Style.FILL
-                    }
-                    var cutY = height * 0.45f
-                    while (cutY < height * 0.75f) {
-                        canvas.drawRect(0f, cutY, width.toFloat(), cutY + 4f, cutPaint)
-                        cutY += 12f
-                    }
-                    
-                    for (i in 0..8) {
-                        val xStart = (width / 8f) * i
-                        canvas.drawLine(xStart, height * 0.7f, (width / 2f) + (xStart - width / 2f) * 2.5f, height.toFloat(), linePaint)
-                    }
-                    for (i in 0..5) {
-                        val y = height * 0.7f + (height * 0.3f / 5) * i
-                        canvas.drawLine(0f, y, width.toFloat(), y, linePaint)
-                    }
-                }
-                "neural", "neural synapses" -> {
-                    val nodePaint = Paint().apply {
-                        color = primaryColor
-                        style = Paint.Style.FILL
-                        isAntiAlias = true
-                    }
-                    val pts = List(density / 2) {
-                        Pair(random.nextFloat() * width, random.nextFloat() * height)
-                    }
-                    linePaint.alpha = 60
-                    for (i in pts.indices) {
-                        for (j in i + 1 until pts.size) {
-                            val dist = Math.hypot((pts[i].first - pts[j].first).toDouble(), (pts[i].second - pts[j].second).toDouble())
-                            if (dist < 80.0) {
-                                canvas.drawLine(pts[i].first, pts[i].second, pts[j].first, pts[j].second, linePaint)
-                            }
-                        }
-                    }
-                    for (pt in pts) {
-                        canvas.drawCircle(pt.first, pt.second, 4f, nodePaint)
-                    }
-                }
-                "quantum", "quantum singularity" -> {
-                    val circlePaint = Paint().apply {
-                        style = Paint.Style.STROKE
-                        isAntiAlias = true
-                    }
-                    for (i in 1..density / 2) {
-                        circlePaint.apply {
-                            color = primaryColor
-                            strokeWidth = (i % 3 + 1).toFloat()
-                            alpha = (255 / i).coerceIn(10, 200)
-                        }
-                        canvas.drawCircle(width / 2f, height / 2f, (i * 8).toFloat(), circlePaint)
-                    }
-                }
-                else -> {
-                    val glyphPaint = Paint().apply {
-                        color = primaryColor
-                        style = Paint.Style.STROKE
-                        strokeWidth = 3f
-                        isAntiAlias = true
-                        alpha = 180
-                    }
-                    val path = Path()
-                    path.moveTo(width / 2f, 40f)
-                    path.lineTo(width - 50f, height / 2f)
-                    path.lineTo(width / 2f, height - 40f)
-                    path.lineTo(50f, height / 2f)
-                    path.close()
-                    canvas.drawPath(path, glyphPaint)
-                    
-                    path.reset()
-                    path.moveTo(width / 2f, 60f)
-                    path.lineTo(width - 70f, height / 2f)
-                    path.lineTo(width / 2f, height - 60f)
-                    path.lineTo(70f, height / 2f)
-                    path.close()
-                    canvas.drawPath(path, glyphPaint)
-                }
-            }
-            
-            val glyphPaint = Paint().apply {
-                color = primaryColor
-                textSize = 54f
-                isAntiAlias = true
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                setShadowLayer(15f, 0f, 0f, primaryColor)
-            }
-            val textBounds = Rect()
-            glyphPaint.getTextBounds(glyphChar, 0, glyphChar.length, textBounds)
-            val glyphY = (height / 2f) - textBounds.exactCenterY()
-            canvas.drawText(glyphChar, width / 2f, glyphY, glyphPaint)
-            
-            val textPaint = Paint().apply {
-                color = primaryColor
-                textSize = 10f
-                alpha = 180
-                typeface = Typeface.MONOSPACE
-                textAlign = Paint.Align.CENTER
-            }
-            canvas.drawText("NODE: $nodeLabel", width / 2f, 25f, textPaint)
-            canvas.drawText("HASH: $cryptoHash", width / 2f, height - 15f, textPaint)
-            
-            val borderPaint = Paint().apply {
-                color = primaryColor
-                strokeWidth = 4f
-                style = Paint.Style.STROKE
-                isAntiAlias = true
-                alpha = 150
-            }
-            canvas.drawRect(2f, 2f, width - 2f, height - 2f, borderPaint)
-            
-            val file = File(context.filesDir, "custom_avatar.png")
-            FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-            }
-            return file
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return null
-        }
-    }
+    ): File? = AvatarGenerator.renderAvatarToBitmap(context, alias, avatarStyle, specJson)
 
     suspend fun generateCustomArcana(
         userConcept: String,
         systemLanguage: String = "en"
     ): GeneratedArcanaData = withContext(Dispatchers.IO) {
-        val rawApiKey = BuildConfig.GEMINI_API_KEY
-        val isApiKeyInvalid = rawApiKey.isBlank() ||
-                rawApiKey == "MY_GEMINI_API_KEY" ||
-                rawApiKey.contains("placeholder", ignoreCase = true)
-
-        if (!isApiKeyInvalid) {
+        val apiKey = resolveConfiguredApiKey()
+        if (apiKey != null) {
             try {
-                val promptText = """
+                val systemPrompt = """
                     You are a cyberpunk occult game designer for a Cyber Tarot TCG game.
-                    Create a unique custom battle card from this user concept: "$userConcept".
-                    Language: $systemLanguage.
                     Respond ONLY with valid JSON with keys:
-                    "name" (Cyberpunk title, e.g. "Neon Blade Runner"),
-                    "traditionalName" (Tarot archetype, e.g. "The Chariot Prime"),
-                    "element" (One of: "CYBER", "BIO", "QUANTUM", "VOID"),
-                    "rarity" (One of: "Rare", "Epic", "Legend"),
-                    "energyCost" (integer 2 to 5),
-                    "power" (integer 4 to 9),
-                    "defense" (integer 4 to 9),
-                    "abilityTitle" (Short cyber ability title),
-                    "abilityDescription" (Ability description, 1 sentence),
-                    "lore" (Atmospheric cyber lore, 2 sentences),
-                    "advice" (Oracle advice quote, 1 sentence).
+                    "name", "traditionalName", "element" (CYBER|BIO|QUANTUM|VOID),
+                    "rarity" (Rare|Epic|Legend), "energyCost" (2..5), "power" (4..9), "defense" (4..9),
+                    "abilityTitle", "abilityDescription" (1 sentence), "lore" (2 sentences), "advice" (1 sentence).
                 """.trimIndent()
 
-                val requestJson = JSONObject().apply {
-                    put("contents", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("parts", JSONArray().apply {
-                                put(JSONObject().apply { put("text", promptText) })
-                            })
-                        })
-                    })
-                }
-
-                val request = Request.Builder()
-                    .url("$BASE_URL?key=$rawApiKey")
-                    .post(requestJson.toString().toRequestBody("application/json".toMediaType()))
-                    .build()
-
-                val response = client.newCall(request).execute()
-                val body = response.body?.string()
-                if (response.isSuccessful && !body.isNullOrBlank()) {
-                    val root = JSONObject(body)
-                    val candidates = root.optJSONArray("candidates")
-                    val contentObj = candidates?.optJSONObject(0)?.optJSONObject("content")
-                    val parts = contentObj?.optJSONArray("parts")
-                    val text = parts?.optJSONObject(0)?.optString("text") ?: ""
+                val text = executeGeminiCall(
+                    apiKey = apiKey,
+                    userPrompt = "Create a unique custom battle card in language '$systemLanguage' from user concept: \"$userConcept\".",
+                    systemPrompt = systemPrompt,
+                    temperature = 0.7
+                )
+                if (!text.isNullOrBlank()) {
                     val jsonStart = text.indexOf('{')
                     val jsonEnd = text.lastIndexOf('}')
-                    if (jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart) {
+                    if (jsonStart != -1 && jsonEnd > jsonStart) {
                         val parsed = JSONObject(text.substring(jsonStart, jsonEnd + 1))
                         return@withContext GeneratedArcanaData(
                             name = parsed.optString("name", "Cyber Arcana"),
@@ -1084,12 +644,13 @@ object GeminiService {
                         )
                     }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Fall through cleanly to local procedural generator
             }
         }
 
-        // High-fidelity Procedural Generator Fallback
         val isRu = systemLanguage == "ru"
         val lower = userConcept.lowercase()
         val element = when {
@@ -1099,27 +660,22 @@ object GeminiService {
             else -> "CYBER"
         }
 
-        val formattedConcept = userConcept.trim().replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
-        val name = if (isRu) {
-            "Нейро-Аркан «$formattedConcept»"
-        } else {
-            "Cyber Arcana: $formattedConcept"
+        val formattedConcept = userConcept.trim().replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString()
         }
-
+        val name = if (isRu) "Нейро-Аркан «$formattedConcept»" else "Cyber Arcana: $formattedConcept"
         val archetype = when (element) {
             "BIO" -> if (isRu) "Верховный Друид Био-Матрицы" else "Bio-Matrix Druid"
             "QUANTUM" -> if (isRu) "Квантовый Пророк Сети" else "Quantum Net Prophet"
             "VOID" -> if (isRu) "Теневой Сталкер Даркнета" else "Darknet Shadow Stalker"
             else -> if (isRu) "Мастер Чипов и Кибер-Огня" else "Master of Cyber-Fire"
         }
-
         val abilityTitle = when (element) {
             "BIO" -> if (isRu) "Био-Регенерация" else "Bio-Regen"
             "QUANTUM" -> if (isRu) "Квантовая Фазировка" else "Quantum Phasing"
             "VOID" -> if (isRu) "Поглощение Пустоты" else "Void Siphon"
             else -> if (isRu) "Лазерная Перегрузка" else "Laser Overclock"
         }
-
         val abilityDesc = when (element) {
             "BIO" -> if (isRu) "Восстанавливает +4 HP при успешной атаке" else "Restores +4 HP on attack"
             "QUANTUM" -> if (isRu) "Дает +5 очков щита при выкладке на доску" else "Grants +5 shield barrier on deploy"

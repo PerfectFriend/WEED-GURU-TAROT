@@ -436,7 +436,7 @@ object LocalizationHelper {
         if (dbDict != null) {
             return dbDict[activeLang] ?: dbDict["en"] ?: key
         }
-        val dict = translations[activeLang] ?: translations["en"]!!
+        val dict = translations[activeLang] ?: translations["en"].orEmpty()
         return dict[key] ?: translations["en"]?.get(key) ?: key
     }
 }

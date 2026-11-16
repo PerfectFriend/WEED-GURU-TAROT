@@ -43,7 +43,8 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
@@ -73,8 +74,12 @@ googleServices {
   missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN
 }
 
+ksp {
+  arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 tasks.withType<Test> {
-  failFast = true
+  failFast = false
   timeout.set(Duration.ofMinutes(2))
   testLogging {
     events("passed", "failed", "skipped")

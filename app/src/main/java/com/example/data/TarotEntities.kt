@@ -55,7 +55,8 @@ data class UserProfile(
     val nodeBandwidthMbps: Double = 5.0,
     val nodeGlobalRank: Int = 999,
     val nodeLastActiveTime: Long = 0L,
-    val nodeIsOnline: Boolean = false
+    val nodeIsOnline: Boolean = false,
+    val cloudRewardClaimed: Boolean = false
 )
 
 @Immutable

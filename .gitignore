@@ -1,11 +1,17 @@
 *.apk
 *.zip
 .env
+local.properties
+*.jks
+*.keystore
+!debug.keystore
 .gradle/
 build/
 app/build/
 .kotlin/
 .build-outputs/
+.aistudio/
+captures/
 app/src/main/assets/CyberTarot.apk
 *-debug.log
 firebase-debug.log

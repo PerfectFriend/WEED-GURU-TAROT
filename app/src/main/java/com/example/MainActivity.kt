@@ -29,7 +29,6 @@ class MainActivity : ComponentActivity() {
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
-        WindowCompat.setDecorFitsSystemWindows(window, false)
         enableEdgeToEdge()
         hideSystemBars()
 

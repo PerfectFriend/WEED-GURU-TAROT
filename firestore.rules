@@ -10,18 +10,81 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isValidUserSchema(data, userId) {
+      return data.keys().hasOnly([
+          'userId', 'username', 'weed', 'avatarIndex',
+          'systemLanguage', 'createdAt', 'lastSyncTimestamp'
+        ])
+        && data.userId == userId
+        && data.username is string
+        && data.username.size() > 0
+        && data.username.size() <= 64
+        && data.weed is number
+        && data.weed >= 0;
+    }
+
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && isValidUserSchema(request.resource.data, userId)
+        && request.resource.data.weed <= 1000;
+      allow update: if isOwner(userId)
+        && isValidUserSchema(request.resource.data, userId)
+        // Economy hardening (H7): clients cannot mint or inflate WEED directly
+        && request.resource.data.weed == resource.data.weed;
+      allow delete: if isOwner(userId);
 
       match /readings/{readingId} {
-        allow read, write: if isOwner(userId);
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly([
+            'id', 'userId', 'question', 'cardIndices',
+            'isUpright', 'report', 'timestamp'
+          ])
+          && request.resource.data.userId == userId
+          && request.resource.data.question is string
+          && request.resource.data.question.size() <= 1000
+          && request.resource.data.report is string
+          && request.resource.data.report.size() <= 20000
+          && request.resource.data.timestamp is number;
       }
     }
 
     match /market/{listingId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.sellerId == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasOnly([
+          'id', 'sellerId', 'buyerId', 'cardIndex',
+          'price', 'timestamp', 'isSold'
+        ])
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.cardIndex is int
+        && request.resource.data.cardIndex >= 0
+        && request.resource.data.price is number
+        && request.resource.data.price > 0
+        && (!('isSold' in request.resource.data) || request.resource.data.isSold == false);
+
+      allow update: if isAuthenticated() && (
+        // Seller edits unsold listing price/metadata
+        (resource.data.sellerId == request.auth.uid
+          && resource.data.get('isSold', false) == false
+          && request.resource.data.sellerId == resource.data.sellerId
+          && request.resource.data.price is number
+          && request.resource.data.price > 0)
+        ||
+        // Buyer atomically marks unsold listing as purchased without tampering price/card/seller
+        (resource.data.get('isSold', false) == false
+          && resource.data.sellerId != request.auth.uid
+          && request.resource.data.isSold == true
+          && request.resource.data.buyerId == request.auth.uid
+          && request.resource.data.sellerId == resource.data.sellerId
+          && request.resource.data.price == resource.data.price
+          && request.resource.data.cardIndex == resource.data.cardIndex)
+      );
+
+      allow delete: if isAuthenticated()
+        && resource.data.sellerId == request.auth.uid
+        && resource.data.get('isSold', false) == false;
     }
   }
 }

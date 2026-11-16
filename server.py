@@ -195,48 +195,90 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
-class ApkDownloadHandler(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=DIRECTORY, **kwargs)
+import urllib.parse
 
+ALLOWED_DOWNLOADS = {
+    "/shmall.apk": os.path.realpath(os.path.join(DIRECTORY, "shmall.apk")),
+    "/shmall.apk.zip": os.path.realpath(os.path.join(DIRECTORY, "shmall.apk.zip")),
+    "/downloads/WeedGuru.apk": os.path.realpath(os.path.join(DIRECTORY, "downloads", "WeedGuru.apk")),
+}
+
+class ApkDownloadHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path in ["/", "/index.html"]:
+        parsed_path = urllib.parse.urlparse(self.path).path
+
+        if parsed_path in ("/", "/index.html"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("X-Content-Type-Options", "nosniff")
             content = HTML_TEMPLATE.encode("utf-8")
             self.send_header("Content-Length", str(len(content)))
             self.end_headers()
             self.wfile.write(content)
             return
 
-        if self.path.endswith(".apk") or self.path.endswith(".zip"):
-            filename = os.path.basename(self.path.split("?")[0])
-            filepath = os.path.join(DIRECTORY, filename)
-            if not os.path.exists(filepath):
-                for alt in ["/app/applet/" + filename, "/app/applet/downloads/" + filename, "/app/applet/apk/" + filename]:
-                    if os.path.exists(alt):
-                        filepath = alt
-                        break
+        filepath = ALLOWED_DOWNLOADS.get(parsed_path)
+        if not filepath or not os.path.isfile(filepath):
+            self.send_error(404, "File not found")
+            return
 
-            if os.path.exists(filepath):
-                size = os.path.getsize(filepath)
-                contentType = "application/vnd.android.package-archive" if filepath.endswith(".apk") else "application/zip"
-                self.send_response(200)
-                self.send_header("Content-Type", contentType)
-                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-                self.send_header("Content-Length", str(size))
-                self.send_header("Accept-Ranges", "bytes")
-                self.end_headers()
-                with open(filepath, "rb") as f:
-                    while chunk := f.read(65536):
-                        self.wfile.write(chunk)
-                return
+        size = os.path.getsize(filepath)
+        filename = os.path.basename(filepath)
+        content_type = "application/vnd.android.package-archive" if filepath.endswith(".apk") else "application/zip"
 
-        return super().do_GET()
+        start = 0
+        end = size - 1
+        status_code = 200
+        range_header = self.headers.get("Range")
+        if range_header and range_header.startswith("bytes="):
+            spec = range_header[len("bytes="):].split(",", 1)[0].strip()
+            parts = spec.split("-", 1)
+            if len(parts) == 2:
+                try:
+                    if parts[0]:
+                        start = int(parts[0])
+                        end = int(parts[1]) if parts[1] else size - 1
+                    elif parts[1]:
+                        suffix = int(parts[1])
+                        start = max(0, size - suffix)
+                        end = size - 1
+                    if start < 0 or end >= size or start > end:
+                        self.send_response(416)
+                        self.send_header("Content-Range", f"bytes */{size}")
+                        self.end_headers()
+                        return
+                    status_code = 206
+                except ValueError:
+                    start, end, status_code = 0, size - 1, 200
+
+        length = (end - start) + 1
+        self.send_response(status_code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        if status_code == 206:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.send_header("Content-Length", str(length))
+        self.end_headers()
+
+        remaining = length
+        with open(filepath, "rb") as f:
+            f.seek(start)
+            while remaining > 0:
+                chunk = f.read(min(65536, remaining))
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                remaining -= len(chunk)
+
+
+class ThreadingApkServer(http.server.ThreadingHTTPServer):
+    allow_reuse_address = True
+
 
 if __name__ == "__main__":
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("0.0.0.0", PORT), ApkDownloadHandler) as httpd:
-        print(f"Serving APK downloads on port {PORT}...")
+    with ThreadingApkServer(("0.0.0.0", PORT), ApkDownloadHandler) as httpd:
+        print(f"Serving allowlisted APK downloads on port {PORT}...")
         httpd.serve_forever()

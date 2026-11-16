@@ -1,10 +1,9 @@
 package com.example.data
 
-import android.content.Context
+import com.example.BuildConfig
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -40,7 +39,8 @@ data class NftMintResult(
     val network: String,
     val tokenUri: String,
     val explorerUrl: String,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isSimulated: Boolean = false
 )
 
 data class ContractDetails(
@@ -112,21 +112,20 @@ class EvmTestnetSmartContractService : TestnetSmartContract {
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.SECONDS)
         .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
         })
         .build()
 
     private val retrofit = Retrofit.Builder()
-        .baseUrl("https://localhost/") // Placeholder baseUrl, dynamic @Url used
+        .baseUrl("https://localhost/")
         .client(okHttpClient)
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
 
     private val rpcApi = retrofit.create(JsonRpcApi::class.java)
 
-    // Fallback/Simulated database to make it highly visual & functional even in offline / local test conditions
     private val simulatedOwners = mutableMapOf<Int, String>()
-    private var simulatedTotalSupply = 24 // Prepopulate with 24 legendary minted nodes
+    private var simulatedTotalSupply = 24
 
     override suspend fun mintTarotNFT(
         ownerAddress: String,
@@ -138,10 +137,11 @@ class EvmTestnetSmartContractService : TestnetSmartContract {
         val gasPriceGwei = getGasPrice(rpcUrl)
         val gasUsed = Random.nextLong(120000, 185000)
 
-        // 1. Live EVM RPC Network Call
-        if (rpcUrl.isNotBlank() && rpcUrl.startsWith("http")) {
+        // 1. Live EVM RPC Read-Only Connectivity Check
+        // Honest behavior (C6): querying eth_blockNumber does NOT broadcast a signed transaction.
+        // Without a Web3 transaction signer / backend relayer, never fabricate a txHash or Etherscan URL.
+        if (rpcUrl.isNotBlank() && (rpcUrl.startsWith("https://") || rpcUrl.startsWith("http://"))) {
             return@withContext try {
-                // Query block number from remote EVM node to verify connectivity
                 val blockResponse = rpcApi.postRpc(
                     rpcUrl,
                     JsonRpcRequest(method = "eth_blockNumber", params = emptyList())
@@ -151,28 +151,21 @@ class EvmTestnetSmartContractService : TestnetSmartContract {
                 )
                 val currentBlock = java.lang.Long.decode(blockHex)
 
-                val hashInput = "${ownerAddress}_${metadata.cardIndex}_${metadata.mintNumber}_${System.currentTimeMillis()}"
-                val txHash = "0x" + sha256(hashInput)
-
-                simulatedOwners[tokenId] = ownerAddress
-                simulatedTotalSupply++
-                val tokenUri = "ipfs://Qm" + sha256(metadata.toString()).take(46)
-
                 NftMintResult(
-                    success = true,
-                    txHash = txHash,
-                    blockNumber = currentBlock + Random.nextLong(1, 4),
-                    tokenId = tokenId,
-                    gasUsed = gasUsed,
+                    success = false,
+                    txHash = "",
+                    blockNumber = currentBlock,
+                    tokenId = 0,
+                    gasUsed = 0L,
                     gasPriceGwei = gasPriceGwei,
                     contractAddress = contractAddress,
-                    network = getNetworkNameFromUrl(rpcUrl),
-                    tokenUri = tokenUri,
-                    explorerUrl = getExplorerUrl(rpcUrl, txHash),
-                    errorMessage = null
+                    network = "${getNetworkNameFromUrl(rpcUrl)} (Read-Only)",
+                    tokenUri = "",
+                    explorerUrl = "",
+                    errorMessage = "RPC node reachable (Block #$currentBlock), but on-chain minting is disabled: no EVM private-key signer/relayer is connected. Clear RPC URL to preview in Local Sandbox mode.",
+                    isSimulated = true
                 )
             } catch (e: Exception) {
-                // Honest error reporting: never fake success when network connection fails
                 NftMintResult(
                     success = false,
                     txHash = "",
@@ -184,19 +177,20 @@ class EvmTestnetSmartContractService : TestnetSmartContract {
                     network = getNetworkNameFromUrl(rpcUrl),
                     tokenUri = "",
                     explorerUrl = "",
-                    errorMessage = "RPC Node Connection Error: ${e.localizedMessage ?: e.message ?: "Connection failed"}. Check RPC URL or network connection."
+                    errorMessage = "RPC Node Connection Error: ${e.localizedMessage ?: e.message ?: "Connection failed"}.",
+                    isSimulated = true
                 )
             }
         }
 
-        // 2. Explicit Local Sandbox Mode (No Network RPC)
+        // 2. Explicit Local Sandbox Mode (No Network RPC — Clearly Labeled Offline Preview)
         val hashInputLocal = "SANDBOX_${ownerAddress}_${metadata.cardIndex}_${metadata.mintNumber}_${System.currentTimeMillis()}"
         val txHashLocal = "0x" + sha256(hashInputLocal)
         val mockBlock = Random.nextLong(1000, 2000)
 
         simulatedOwners[tokenId] = ownerAddress
         simulatedTotalSupply++
-        val simulatedTokenUri = "ipfs://Qm" + sha256(metadata.toString()).take(46)
+        val simulatedTokenUri = "sandbox://metadata/${metadata.cardIndex}/${metadata.mintNumber}"
 
         return@withContext NftMintResult(
             success = true,
@@ -208,24 +202,28 @@ class EvmTestnetSmartContractService : TestnetSmartContract {
             contractAddress = contractAddress,
             network = "Local Sandbox (Offline)",
             tokenUri = simulatedTokenUri,
-            explorerUrl = "", // Honest: no fake external block explorer URL for local sandbox
-            errorMessage = null
+            explorerUrl = "",
+            errorMessage = null,
+            isSimulated = true
         )
     }
 
     override suspend fun getContractDetails(rpcUrl: String, contractAddress: String): ContractDetails {
         return ContractDetails(
-            name = "Cyber Tarot Oracle Archive",
+            name = "Cyber Tarot Sandbox Registry",
             symbol = "TAROT",
             address = contractAddress.ifBlank { "0xC72a1068E370A8D6e326C7cf65749be9e7ab9CF2" },
-            networkName = if (rpcUrl.contains("sepolia", true)) "Sepolia Testnet" else "Holesky Testnet",
-            owner = "0x9E88d6C7BaF8F4f3183f233f6329686259e7ab9C",
-            version = "v1.2.0-beta"
+            networkName = when {
+                rpcUrl.isBlank() -> "Local Sandbox (Offline)"
+                rpcUrl.contains("sepolia", true) -> "Sepolia Testnet (Read-Only)"
+                else -> "Holesky Testnet (Read-Only)"
+            },
+            owner = "Sandbox Preview",
+            version = "v1.2.0-sandbox"
         )
     }
 
     override suspend fun getOwnerOfToken(tokenId: Int, rpcUrl: String, contractAddress: String): String? {
-        // Return simulated mapping
         return simulatedOwners[tokenId] ?: "0x0000000000000000000000000000000000000000"
     }
 
@@ -235,16 +233,16 @@ class EvmTestnetSmartContractService : TestnetSmartContract {
 
     override suspend fun getGasPrice(rpcUrl: String): Double {
         return try {
-            if (rpcUrl.isNotBlank() && rpcUrl.startsWith("http")) {
+            if (rpcUrl.isNotBlank() && rpcUrl.startsWith("https://")) {
                 val response = rpcApi.postRpc(rpcUrl, JsonRpcRequest(method = "eth_gasPrice", params = emptyList()))
                 val gasHex = response.result ?: throw Exception()
                 val gasWei = java.lang.Long.decode(gasHex)
-                gasWei.toDouble() / 1_000_000_000.0 // Convert to Gwei
+                gasWei.toDouble() / 1_000_000_000.0
             } else {
                 Random.nextDouble(12.5, 24.8)
             }
-        } catch (e: Exception) {
-            Random.nextDouble(15.0, 32.5) // Standard Gwei
+        } catch (_: Exception) {
+            Random.nextDouble(15.0, 32.5)
         }
     }
 
@@ -260,14 +258,6 @@ class EvmTestnetSmartContractService : TestnetSmartContract {
             url.contains("infura", true) -> "EVM Bridge (Infura)"
             url.contains("alchemy", true) -> "EVM Bridge (Alchemy)"
             else -> "Custom EVM Chain"
-        }
-    }
-
-    private fun getExplorerUrl(rpcUrl: String, txHash: String): String {
-        return if (rpcUrl.contains("sepolia", true)) {
-            "https://sepolia.etherscan.io/tx/$txHash"
-        } else {
-            "https://holesky.etherscan.io/tx/$txHash"
         }
     }
 }

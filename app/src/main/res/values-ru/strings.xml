@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Шмаль</string>
+    <string name="widget_label">Cyber Tarot: Карта Дня</string>
+    <string name="widget_default_lunar">🌔 Растущая Луна • 74%</string>
+    <string name="widget_default_status">ЯДРО ОНЛАЙН ⚡</string>
+    <string name="widget_default_icon">🔮</string>
+    <string name="widget_default_title">Бадтендер</string>
+    <string name="widget_default_subtitle">Маг • Genesis</string>
+    <string name="widget_default_advice">Оракул: Мастерство четырех стихий. Начните новый цикл культивации.</string>
+    <string name="widget_action_prompt">➔ ОТКРЫТЬ В ХАБЕ</string>
 </resources>

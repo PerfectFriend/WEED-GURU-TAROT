@@ -1,33 +1,38 @@
 package com.example.data
 
 import android.content.Context
+import android.util.Base64
 import androidx.room.Room
+import androidx.room.withTransaction
+import com.example.data.crypto.CryptoHelper
+import com.example.data.crypto.SecureVaultHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
-import com.example.data.crypto.CryptoHelper
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.random.Random
-import java.security.MessageDigest
-import javax.crypto.Cipher
-import javax.crypto.spec.SecretKeySpec
-import android.util.Base64
-import java.net.Proxy
-import java.net.InetSocketAddress
-import java.net.URL
 import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.net.URL
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
+import javax.crypto.spec.SecretKeySpec
+import kotlin.random.Random
 
 class TarotRepository private constructor(context: Context) {
 
+    private val appContext = context.applicationContext
+    private val channelKeyCache = ConcurrentHashMap<String, SecretKeySpec>()
+
     private val database: TarotDatabase = Room.databaseBuilder(
-        context.applicationContext,
+        appContext,
         TarotDatabase::class.java,
         "cyber_tarot_db"
     )
-    .fallbackToDestructiveMigration(true)
+    .addMigrations(TarotDatabase.MIGRATION_15_16)
     .build()
 
     private val dao = database.tarotDao()
@@ -60,24 +65,28 @@ class TarotRepository private constructor(context: Context) {
     }
 
     suspend fun saveDeck(name: String, icon: String, cardIndices: List<Int>, makeActive: Boolean, description: String = "", deckId: Int = 0): Long = withContext(Dispatchers.IO) {
-        if (makeActive) {
-            dao.clearActiveDecks()
-        }
-        dao.insertOrUpdateDeck(
-            SavedDeck(
-                id = deckId,
-                name = name,
-                icon = icon,
-                cardIndicesString = cardIndices.joinToString(","),
-                isActive = makeActive,
-                description = description
+        database.withTransaction {
+            if (makeActive) {
+                dao.clearActiveDecks()
+            }
+            dao.insertOrUpdateDeck(
+                SavedDeck(
+                    id = deckId,
+                    name = name,
+                    icon = icon,
+                    cardIndicesString = cardIndices.joinToString(","),
+                    isActive = makeActive,
+                    description = description
+                )
             )
-        )
+        }
     }
 
     suspend fun setActiveDeck(deckId: Int) = withContext(Dispatchers.IO) {
-        dao.clearActiveDecks()
-        dao.setActiveDeckById(deckId)
+        database.withTransaction {
+            dao.clearActiveDecks()
+            dao.setActiveDeckById(deckId)
+        }
     }
 
     suspend fun deleteDeck(deck: SavedDeck) = withContext(Dispatchers.IO) {
@@ -89,33 +98,35 @@ class TarotRepository private constructor(context: Context) {
     }
 
     suspend fun upgradeCardStat(cardIndex: Int, stat: String): Boolean = withContext(Dispatchers.IO) {
-        val current = dao.getCardUpgrade(cardIndex) ?: CardUpgrade(cardIndex = cardIndex)
-        val profile = dao.getUserProfileSync() ?: return@withContext false
-        val cost = when (stat) {
-            "POWER" -> 100 * current.upgradeLevel
-            "DEFENSE" -> 100 * current.upgradeLevel
-            "RAM" -> 250
-            else -> 100
-        }
-        if (profile.weed < cost) return@withContext false
+        database.withTransaction {
+            val current = dao.getCardUpgrade(cardIndex) ?: CardUpgrade(cardIndex = cardIndex)
+            val profile = dao.getUserProfileSync() ?: return@withTransaction false
+            val cost = when (stat) {
+                "POWER" -> 100 * current.upgradeLevel
+                "DEFENSE" -> 100 * current.upgradeLevel
+                "RAM" -> 250
+                else -> 100
+            }
+            if (profile.weed < cost) return@withTransaction false
 
-        val updated = when (stat) {
-            "POWER" -> current.copy(
-                upgradeLevel = (current.upgradeLevel + 1).coerceAtMost(5),
-                bonusPower = current.bonusPower + 1
-            )
-            "DEFENSE" -> current.copy(
-                upgradeLevel = (current.upgradeLevel + 1).coerceAtMost(5),
-                bonusDefense = current.bonusDefense + 1
-            )
-            "RAM" -> current.copy(
-                energyDiscount = 1
-            )
-            else -> current
+            val updated = when (stat) {
+                "POWER" -> current.copy(
+                    upgradeLevel = (current.upgradeLevel + 1).coerceAtMost(5),
+                    bonusPower = current.bonusPower + 1
+                )
+                "DEFENSE" -> current.copy(
+                    upgradeLevel = (current.upgradeLevel + 1).coerceAtMost(5),
+                    bonusDefense = current.bonusDefense + 1
+                )
+                "RAM" -> current.copy(
+                    energyDiscount = 1
+                )
+                else -> current
+            }
+            dao.updateProfile(profile.copy(weed = profile.weed - cost))
+            dao.insertOrUpdateCardUpgrade(updated)
+            true
         }
-        dao.updateProfile(profile.copy(weed = profile.weed - cost))
-        dao.insertOrUpdateCardUpgrade(updated)
-        true
     }
 
     suspend fun setCardSkin(cardIndex: Int, skin: String) = withContext(Dispatchers.IO) {
@@ -184,7 +195,9 @@ class TarotRepository private constructor(context: Context) {
         val currentCards = dao.getCardLocalizationItems()
         CardLocalizationHelper.loadFromDatabase(currentCards)
 
-        if (existingProfile == null) {
+        if (existingProfile != null) {
+            migrateLegacySecretsIfNeeded(existingProfile)
+        } else {
             // Setup default profile
             dao.insertProfile(
                 UserProfile(
@@ -697,20 +710,22 @@ class TarotRepository private constructor(context: Context) {
 
     // Mine free Weed (daily Node Harvest)
     suspend fun mineCredits(amount: Int = 300) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        val updated = profile.copy(weed = profile.weed + amount)
-        dao.updateProfile(updated)
-        
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = -1, // No card, just credit gain
-                rarity = "System",
-                price = amount,
-                type = "MINE",
-                targetParty = "Sol Array Node",
-                timestamp = System.currentTimeMillis()
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val updated = profile.copy(weed = profile.weed + amount)
+            dao.updateProfile(updated)
+
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = -1,
+                    rarity = "System",
+                    price = amount,
+                    type = "MINE",
+                    targetParty = "Sol Array Node",
+                    timestamp = System.currentTimeMillis()
+                )
             )
-        )
+        }
     }
 
     // Claim active Weed mining reward
@@ -718,60 +733,68 @@ class TarotRepository private constructor(context: Context) {
         onSuccess: (manaRewarded: Int, newStreak: Int) -> Unit,
         onFailed: (String) -> Unit
     ) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        val currentTime = System.currentTimeMillis()
-        val lastClaim = profile.lastWeedClaimTime
-        
-        // 6 hours in milliseconds = 6 * 60 * 60 * 1000 = 21,600,000
-        val claimInterval = 6 * 60 * 60 * 1000L
-        // 12 hours in milliseconds = 12 * 60 * 60 * 1000 = 43,200,000
-        val streakLimit = 12 * 60 * 60 * 1000L
+        var failedMsg: String? = null
+        var successReward = 0
+        var successStreak = 0
 
-        if (lastClaim != 0L && (currentTime - lastClaim) < claimInterval) {
-            val remainingSec = ((claimInterval - (currentTime - lastClaim)) / 1000).toInt()
-            val hours = remainingSec / 3600
-            val minutes = (remainingSec % 3600) / 60
-            val seconds = remainingSec % 60
-            onFailed("⚠️ Coolant flush in progress. Grid link available in %02d:%02d:%02d.".format(hours, minutes, seconds))
-            return@withContext
-        }
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val currentTime = System.currentTimeMillis()
+            val lastClaim = profile.lastWeedClaimTime
 
-        val newStreak: Int
-        val manaRewarded: Int
+            val claimInterval = 6 * 60 * 60 * 1000L
+            val streakLimit = 12 * 60 * 60 * 1000L
 
-        if (lastClaim == 0L) {
-            // First claim ever
-            newStreak = 1
-            manaRewarded = 1
-        } else if ((currentTime - lastClaim) <= streakLimit) {
-            // Claimed on time (between 6 and 12 hours)
-            newStreak = profile.weedStreak + 1
-            manaRewarded = newStreak
-        } else {
-            // Claimed too late (missed the 6-hour window since availability, i.e., > 12 hours)
-            newStreak = 1
-            manaRewarded = 1
-        }
+            if (lastClaim != 0L && (currentTime - lastClaim) < claimInterval) {
+                val remainingSec = ((claimInterval - (currentTime - lastClaim)) / 1000).toInt()
+                val hours = remainingSec / 3600
+                val minutes = (remainingSec % 3600) / 60
+                val seconds = remainingSec % 60
+                failedMsg = "⚠️ Coolant flush in progress. Grid link available in %02d:%02d:%02d.".format(hours, minutes, seconds)
+                return@withTransaction
+            }
 
-        val updated = profile.copy(
-            weed = profile.weed + manaRewarded,
-            weedStreak = newStreak,
-            lastWeedClaimTime = currentTime
-        )
-        dao.updateProfile(updated)
+            val newStreak: Int
+            val manaRewarded: Int
 
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = -1,
-                rarity = "System",
-                price = manaRewarded,
-                type = "MINE",
-                targetParty = "Activity Weed Core",
-                timestamp = currentTime
+            if (lastClaim == 0L) {
+                newStreak = 1
+                manaRewarded = 1
+            } else if ((currentTime - lastClaim) <= streakLimit) {
+                newStreak = profile.weedStreak + 1
+                manaRewarded = newStreak
+            } else {
+                newStreak = 1
+                manaRewarded = 1
+            }
+
+            val updated = profile.copy(
+                weed = profile.weed + manaRewarded,
+                weedStreak = newStreak,
+                lastWeedClaimTime = currentTime
             )
-        )
+            dao.updateProfile(updated)
 
-        onSuccess(manaRewarded, newStreak)
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = -1,
+                    rarity = "System",
+                    price = manaRewarded,
+                    type = "MINE",
+                    targetParty = "Activity Weed Core",
+                    timestamp = currentTime
+                )
+            )
+            successReward = manaRewarded
+            successStreak = newStreak
+        }
+
+        val err = failedMsg
+        if (err != null) {
+            onFailed(err)
+        } else {
+            onSuccess(successReward, successStreak)
+        }
     }
 
     // Purchase ad banner with Weed
@@ -782,148 +805,149 @@ class TarotRepository private constructor(context: Context) {
         colorHex: String,
         cost: Int
     ): Boolean = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: return@withContext false
-        if (profile.weed < cost) return@withContext false
+        if (cost < 0) return@withContext false
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: return@withTransaction false
+            if (profile.weed < cost) return@withTransaction false
 
-        val updated = profile.copy(weed = profile.weed - cost)
-        dao.updateProfile(updated)
+            val updated = profile.copy(weed = profile.weed - cost)
+            dao.updateProfile(updated)
 
-        dao.insertAdBanner(
-            AdBanner(
-                title = title,
-                content = content,
-                theme = theme,
-                authorName = profile.alias,
-                authorContactOnion = "${profile.username.lowercase()}.onion",
-                colorHex = colorHex,
-                costPaid = cost,
-                timestamp = System.currentTimeMillis()
+            dao.insertAdBanner(
+                AdBanner(
+                    title = title,
+                    content = content,
+                    theme = theme,
+                    authorName = profile.alias,
+                    authorContactOnion = "${profile.username.lowercase()}.local",
+                    colorHex = colorHex,
+                    costPaid = cost,
+                    timestamp = System.currentTimeMillis()
+                )
             )
-        )
 
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = -1,
-                rarity = "System",
-                price = -cost,
-                type = "BURN",
-                targetParty = "Ad Slots Broadcaster",
-                timestamp = System.currentTimeMillis()
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = -1,
+                    rarity = "System",
+                    price = -cost,
+                    type = "BURN",
+                    targetParty = "Ad Slots Broadcaster",
+                    timestamp = System.currentTimeMillis()
+                )
             )
-        )
-
-        return@withContext true
+            true
+        }
     }
 
     // Purchase Ad-Free subscription for 30 days
     suspend fun subscribeAdFree(cost: Int): Boolean = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: return@withContext false
-        if (profile.weed < cost) return@withContext false
+        if (cost < 0) return@withContext false
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: return@withTransaction false
+            if (profile.weed < cost) return@withTransaction false
 
-        val currentTime = System.currentTimeMillis()
-        val duration30Days = 30L * 24L * 60L * 60L * 1000L // 30 days
+            val currentTime = System.currentTimeMillis()
+            val duration30Days = 30L * 24L * 60L * 60L * 1000L
 
-        val newExpiry = if (profile.isAdFreeSubscribed && profile.adFreeExpiryTime > currentTime) {
-            profile.adFreeExpiryTime + duration30Days
-        } else {
-            currentTime + duration30Days
-        }
+            val newExpiry = if (profile.isAdFreeSubscribed && profile.adFreeExpiryTime > currentTime) {
+                profile.adFreeExpiryTime + duration30Days
+            } else {
+                currentTime + duration30Days
+            }
 
-        val updated = profile.copy(
-            weed = profile.weed - cost,
-            isAdFreeSubscribed = true,
-            adFreeExpiryTime = newExpiry
-        )
-        dao.updateProfile(updated)
-
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = -1,
-                rarity = "System",
-                price = -cost,
-                type = "BURN",
-                targetParty = "Ad-Shield Protocol",
-                timestamp = currentTime
+            val updated = profile.copy(
+                weed = profile.weed - cost,
+                isAdFreeSubscribed = true,
+                adFreeExpiryTime = newExpiry
             )
-        )
+            dao.updateProfile(updated)
 
-        return@withContext true
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = -1,
+                    rarity = "System",
+                    price = -cost,
+                    type = "BURN",
+                    targetParty = "Ad-Shield Protocol",
+                    timestamp = currentTime
+                )
+            )
+            true
+        }
     }
 
-    // Increment Ad Clicks
     suspend fun incrementAdClicks(id: Int) = withContext(Dispatchers.IO) {
         dao.incrementAdClicks(id)
     }
 
-
     // Record a divination draw (awards some Weed!)
     suspend fun recordDivinationDraw(cardCount: Int) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        val earnedCredits = cardCount * 50 // 50 credits per card scanned
-        val updated = profile.copy(
-            weed = profile.weed + earnedCredits,
-            totalDraws = profile.totalDraws + 1
-        )
-        dao.updateProfile(updated)
-
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = -2, // Divination reward
-                rarity = "System",
-                price = earnedCredits,
-                type = "SCAN_REWARD",
-                targetParty = "Matrix Decoder",
-                timestamp = System.currentTimeMillis()
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val earnedCredits = cardCount.coerceAtLeast(0) * 50
+            val updated = profile.copy(
+                weed = profile.weed + earnedCredits,
+                totalDraws = profile.totalDraws + 1
             )
-        )
+            dao.updateProfile(updated)
+
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = -2,
+                    rarity = "System",
+                    price = earnedCredits,
+                    type = "SCAN_REWARD",
+                    targetParty = "Matrix Decoder",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        }
     }
 
-    // Mint a Cyber Tarot NFT card from the interface
+    // Mint a Cyber Tarot Vault card locally
     suspend fun mintTarotNFT(cardIndex: Int, selectedRarity: String? = null): MintedCard? = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        
-        // Calculate dynamic cost of minting
-        val mintCost = 200
-        if (profile.weed < mintCost) {
-            return@withContext null // Insufficient credits
-        }
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val mintCost = 200
+            if (profile.weed < mintCost) {
+                return@withTransaction null
+            }
 
-        val card = CyberTarotDeck.getCard(cardIndex)
-        // Each card's rarity is FIXED to its identity (card.defaultRarity)
-        val rarity = card.defaultRarity
-        val mintNo = Random.nextInt(1, 9999)
+            val card = CyberTarotDeck.getCard(cardIndex)
+            val rarity = card.defaultRarity
+            val mintNo = Random.nextInt(1, 9999)
 
-        val newCard = MintedCard(
-            cardIndex = cardIndex,
-            rarity = rarity,
-            mintNumber = mintNo,
-            timestamp = System.currentTimeMillis(),
-            isListed = false,
-            listPrice = 0
-        )
-
-        val rowId = dao.insertMintedCard(newCard)
-
-        // Deduct credits and update mint count
-        val updatedProfile = profile.copy(
-            weed = profile.weed - mintCost,
-            totalMints = profile.totalMints + 1
-        )
-        dao.updateProfile(updatedProfile)
-
-        // Insert log
-        dao.insertTransactionLog(
-            TransactionLog(
+            val newCard = MintedCard(
                 cardIndex = cardIndex,
                 rarity = rarity,
-                price = mintCost,
-                type = "MINT",
-                targetParty = "Automated Minting Core",
-                timestamp = System.currentTimeMillis()
+                mintNumber = mintNo,
+                timestamp = System.currentTimeMillis(),
+                isListed = false,
+                listPrice = 0
             )
-        )
 
-        return@withContext newCard.copy(id = rowId.toInt())
+            val rowId = dao.insertMintedCard(newCard)
+
+            val updatedProfile = profile.copy(
+                weed = profile.weed - mintCost,
+                totalMints = profile.totalMints + 1
+            )
+            dao.updateProfile(updatedProfile)
+
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = cardIndex,
+                    rarity = rarity,
+                    price = mintCost,
+                    type = "MINT",
+                    targetParty = "Local Vault Minting Core",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+
+            newCard.copy(id = rowId.toInt())
+        }
     }
 
     enum class FusionType {
@@ -933,51 +957,53 @@ class TarotRepository private constructor(context: Context) {
         EPIC_TO_GENESIS   // 10 Epic -> 1 Genesis Gold
     }
 
-    // Fuse / Synthesize cards into higher rarity tier
+    // Fuse / Synthesize cards into higher rarity tier atomically
     suspend fun fuseCards(fusionType: FusionType): MintedCard? = withContext(Dispatchers.IO) {
-        val (sourceRarity, reqCount, targetRarity) = when (fusionType) {
-            FusionType.COMMON_TO_RARE -> Triple("Common", 4, "Rare")
-            FusionType.RARE_TO_EPIC -> Triple("Rare", 4, "Epic")
-            FusionType.EPIC_TO_LEGEND -> Triple("Epic", 4, "Legend")
-            FusionType.EPIC_TO_GENESIS -> Triple("Epic", 10, "Genesis")
-        }
+        database.withTransaction {
+            val (sourceRarity, reqCount, targetRarity) = when (fusionType) {
+                FusionType.COMMON_TO_RARE -> Triple("Common", 4, "Rare")
+                FusionType.RARE_TO_EPIC -> Triple("Rare", 4, "Epic")
+                FusionType.EPIC_TO_LEGEND -> Triple("Epic", 4, "Legend")
+                FusionType.EPIC_TO_GENESIS -> Triple("Epic", 10, "Genesis")
+            }
 
-        val allOwned = dao.getMintedCards().firstOrNull() ?: emptyList()
-        val unlistedMatching = allOwned.filter { !it.isListed && it.rarity.equals(sourceRarity, ignoreCase = true) }
+            val allOwned = dao.getMintedCards().firstOrNull() ?: emptyList()
+            val unlistedMatching = allOwned.filter { !it.isListed && it.rarity.equals(sourceRarity, ignoreCase = true) }
 
-        if (unlistedMatching.size < reqCount) {
-            return@withContext null // Insufficient unlisted cards
-        }
+            if (unlistedMatching.size < reqCount) {
+                return@withTransaction null
+            }
 
-        val cardsToBurn = unlistedMatching.take(reqCount)
-        cardsToBurn.forEach { dao.deleteMintedCard(it) }
+            val cardsToBurn = unlistedMatching.take(reqCount)
+            cardsToBurn.forEach { dao.deleteMintedCard(it) }
 
-        val candidates = CyberTarotDeck.cards.filter { it.defaultRarity.equals(targetRarity, ignoreCase = true) }
-        val chosenCard = if (candidates.isNotEmpty()) candidates.random() else CyberTarotDeck.cards.random()
+            val candidates = CyberTarotDeck.cards.filter { it.defaultRarity.equals(targetRarity, ignoreCase = true) }
+            val chosenCard = if (candidates.isNotEmpty()) candidates.random() else CyberTarotDeck.cards.random()
 
-        val minted = MintedCard(
-            cardIndex = chosenCard.index,
-            rarity = chosenCard.defaultRarity,
-            mintNumber = Random.nextInt(1, 9999),
-            timestamp = System.currentTimeMillis(),
-            isListed = false,
-            listPrice = 0
-        )
-
-        val rowId = dao.insertMintedCard(minted)
-
-        dao.insertTransactionLog(
-            TransactionLog(
+            val minted = MintedCard(
                 cardIndex = chosenCard.index,
                 rarity = chosenCard.defaultRarity,
-                price = 0,
-                type = "FUSION",
-                targetParty = "Genesis Matrix Synthesis",
-                timestamp = System.currentTimeMillis()
+                mintNumber = Random.nextInt(1, 9999),
+                timestamp = System.currentTimeMillis(),
+                isListed = false,
+                listPrice = 0
             )
-        )
 
-        return@withContext minted.copy(id = rowId.toInt())
+            val rowId = dao.insertMintedCard(minted)
+
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = chosenCard.index,
+                    rarity = chosenCard.defaultRarity,
+                    price = 0,
+                    type = "FUSION",
+                    targetParty = "Genesis Matrix Synthesis",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+
+            minted.copy(id = rowId.toInt())
+        }
     }
 
     // Generate random card matching a rolled rarity tier
@@ -993,230 +1019,294 @@ class TarotRepository private constructor(context: Context) {
         return if (candidates.isNotEmpty()) candidates.random() else CyberTarotDeck.cards.random()
     }
 
-    // List an owned NFT for sale in the market
+    // List an owned NFT for sale in the market atomically
     suspend fun listNFT(cardId: Int, askPrice: Int): Boolean = withContext(Dispatchers.IO) {
-        val card = dao.getMintedCardById(cardId) ?: return@withContext false
-        if (card.isListed) return@withContext false
+        if (askPrice <= 0) return@withContext false
+        database.withTransaction {
+            val card = dao.getMintedCardById(cardId) ?: return@withTransaction false
+            if (card.isListed) return@withTransaction false
 
-        // Update card listing status
-        val updatedCard = card.copy(isListed = true, listPrice = askPrice)
-        dao.updateMintedCard(updatedCard)
+            val updatedCard = card.copy(isListed = true, listPrice = askPrice)
+            dao.updateMintedCard(updatedCard)
 
-        // Insert into market listings
-        dao.insertMarketListing(
-            MarketListing(
-                cardIndex = card.cardIndex,
-                rarity = card.rarity,
-                mintNumber = card.mintNumber,
-                price = askPrice,
-                sellerName = "User (You)",
-                isBot = false
+            dao.insertMarketListing(
+                MarketListing(
+                    cardIndex = card.cardIndex,
+                    rarity = card.rarity,
+                    mintNumber = card.mintNumber,
+                    price = askPrice,
+                    sellerName = "User (You)",
+                    isBot = false
+                )
             )
-        )
 
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = card.cardIndex,
-                rarity = card.rarity,
-                price = askPrice,
-                type = "LIST",
-                targetParty = "Exchange Ledger",
-                timestamp = System.currentTimeMillis()
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = card.cardIndex,
+                    rarity = card.rarity,
+                    price = askPrice,
+                    type = "LIST",
+                    targetParty = "Exchange Ledger",
+                    timestamp = System.currentTimeMillis()
+                )
             )
-        )
-        return@withContext true
+            true
+        }
     }
 
-    // Cancel an active listing
+    // Cancel an active listing atomically
     suspend fun cancelListing(cardIndex: Int, mintNumber: Int): Boolean = withContext(Dispatchers.IO) {
-        // Find card
-        val cards = dao.getMintedCards().firstOrNull() ?: emptyList()
-        val card = cards.firstOrNull { it.cardIndex == cardIndex && it.mintNumber == mintNumber && it.isListed }
-            ?: return@withContext false
+        database.withTransaction {
+            val cards = dao.getMintedCards().firstOrNull() ?: emptyList()
+            val card = cards.firstOrNull { it.cardIndex == cardIndex && it.mintNumber == mintNumber && it.isListed }
+                ?: return@withTransaction false
 
-        // Update card status
-        val updatedCard = card.copy(isListed = false, listPrice = 0)
-        dao.updateMintedCard(updatedCard)
+            val updatedCard = card.copy(isListed = false, listPrice = 0)
+            dao.updateMintedCard(updatedCard)
+            dao.deleteMarketListingByCard(cardIndex, mintNumber)
 
-        // Remove from listings
-        dao.deleteMarketListingByCard(cardIndex, mintNumber)
-
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = cardIndex,
-                rarity = card.rarity,
-                price = 0,
-                type = "DELIST",
-                targetParty = "Exchange Ledger",
-                timestamp = System.currentTimeMillis()
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = cardIndex,
+                    rarity = card.rarity,
+                    price = 0,
+                    type = "DELIST",
+                    targetParty = "Exchange Ledger",
+                    timestamp = System.currentTimeMillis()
+                )
             )
-        )
-        return@withContext true
+            true
+        }
     }
 
-    // Sell instantly to "Net Broker" (gives a fair instant price, e.g. 70% of average base price)
+    // Sell instantly to "Net Broker" atomically
     suspend fun sellInstantlyToBroker(cardId: Int): Int = withContext(Dispatchers.IO) {
-        val card = dao.getMintedCardById(cardId) ?: return@withContext -1
-        
-        // Calculate price
-        val basePrice = getBaseMarketPrice(card.rarity)
-        val brokerPrice = (basePrice * 0.75).toInt().coerceAtLeast(15)
+        database.withTransaction {
+            val card = dao.getMintedCardById(cardId) ?: return@withTransaction -1
 
-        // Delete from database (ownership transfer)
-        dao.deleteMintedCard(card)
+            val basePrice = getBaseMarketPrice(card.rarity)
+            val brokerPrice = (basePrice * 0.75).toInt().coerceAtLeast(15)
 
-        // If listed on market, delete from market
-        if (card.isListed) {
-            dao.deleteMarketListingByCard(card.cardIndex, card.mintNumber)
-        }
+            dao.deleteMintedCard(card)
 
-        // Add credits to user
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        val updatedProfile = profile.copy(
-            weed = profile.weed + brokerPrice,
-            totalTrades = profile.totalTrades + 1
-        )
-        dao.updateProfile(updatedProfile)
+            if (card.isListed) {
+                dao.deleteMarketListingByCard(card.cardIndex, card.mintNumber)
+            }
 
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = card.cardIndex,
-                rarity = card.rarity,
-                price = brokerPrice,
-                type = "SELL",
-                targetParty = "Net Broker Liquidity",
-                timestamp = System.currentTimeMillis()
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val updatedProfile = profile.copy(
+                weed = profile.weed + brokerPrice,
+                totalTrades = profile.totalTrades + 1
             )
-        )
+            dao.updateProfile(updatedProfile)
 
-        return@withContext brokerPrice
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = card.cardIndex,
+                    rarity = card.rarity,
+                    price = brokerPrice,
+                    type = "SELL",
+                    targetParty = "Net Broker Liquidity",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+
+            brokerPrice
+        }
     }
 
-    // Buy card from exchange
+    // Buy card from exchange atomically
     suspend fun buyNFTFromExchange(listingId: Int): Boolean = withContext(Dispatchers.IO) {
-        val listing = dao.getMarketListingById(listingId) ?: return@withContext false
-        val profile = dao.getUserProfileSync() ?: UserProfile()
+        database.withTransaction {
+            val listing = dao.getMarketListingById(listingId) ?: return@withTransaction false
+            val profile = dao.getUserProfileSync() ?: UserProfile()
 
-        if (profile.weed < listing.price) {
-            return@withContext false // Insufficient credits
-        }
+            if (listing.sellerName == "User (You)") {
+                return@withTransaction cancelListing(listing.cardIndex, listing.mintNumber)
+            }
 
-        // 1. If it's user's own listing, we shouldn't buy it, but let's handle just in case (cancel is better)
-        if (listing.sellerName == "User (You)") {
-            cancelListing(listing.cardIndex, listing.mintNumber)
-            return@withContext true
-        }
+            if (profile.weed < listing.price) {
+                return@withTransaction false
+            }
 
-        // 2. Remove listing from market
-        dao.deleteMarketListing(listing)
+            dao.deleteMarketListing(listing)
 
-        // 3. Deduct credits and update user stats
-        val updatedProfile = profile.copy(
-            weed = profile.weed - listing.price,
-            totalTrades = profile.totalTrades + 1
-        )
-        dao.updateProfile(updatedProfile)
+            val updatedProfile = profile.copy(
+                weed = profile.weed - listing.price,
+                totalTrades = profile.totalTrades + 1
+            )
+            dao.updateProfile(updatedProfile)
 
-        // 4. Create local MintedCard for user
-        val newCard = MintedCard(
-            cardIndex = listing.cardIndex,
-            rarity = listing.rarity,
-            mintNumber = listing.mintNumber,
-            timestamp = System.currentTimeMillis(),
-            isListed = false,
-            listPrice = 0
-        )
-        dao.insertMintedCard(newCard)
-
-        // 5. Log transaction
-        dao.insertTransactionLog(
-            TransactionLog(
+            val newCard = MintedCard(
                 cardIndex = listing.cardIndex,
                 rarity = listing.rarity,
-                price = listing.price,
-                type = "BUY",
-                targetParty = listing.sellerName,
-                timestamp = System.currentTimeMillis()
+                mintNumber = listing.mintNumber,
+                timestamp = System.currentTimeMillis(),
+                isListed = false,
+                listPrice = 0
             )
-        )
+            dao.insertMintedCard(newCard)
 
-        return@withContext true
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = listing.cardIndex,
+                    rarity = listing.rarity,
+                    price = listing.price,
+                    type = "BUY",
+                    targetParty = listing.sellerName,
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+
+            true
+        }
     }
 
     // Trigger random market events (bots buying or listing new cards)
     suspend fun tickMarketSimulation() = withContext(Dispatchers.IO) {
-        val listings = dao.getMarketListings().firstOrNull() ?: emptyList()
-        val botNames = listOf("Proxy_Gamer", "Cyber_Spectre", "ZeroDay_Trader", "Net_Viper", "Glitch_Daemon", "Core_Scraper")
-        
-        // Randomly decide event type
-        val eventRoll = Random.nextInt(1, 10)
-        
-        if (eventRoll <= 3 && listings.size < 15) {
-            // Event 1: Bot lists a new random card
-            val randomCardIndex = CyberTarotDeck.cards.random().index
-            val card = CyberTarotDeck.getCard(randomCardIndex)
-            val basePrice = getBaseMarketPrice(card.defaultRarity)
-            val markup = Random.nextInt(-25, 35)
-            val price = (basePrice + markup).coerceAtLeast(15)
+        database.withTransaction {
+            val listings = dao.getMarketListings().firstOrNull() ?: emptyList()
+            val botNames = listOf("Proxy_Gamer", "Cyber_Spectre", "ZeroDay_Trader", "Net_Viper", "Glitch_Daemon", "Core_Scraper")
 
-            dao.insertMarketListing(
-                MarketListing(
-                    cardIndex = randomCardIndex,
-                    rarity = card.defaultRarity,
-                    mintNumber = Random.nextInt(100, 9999),
-                    price = price,
-                    sellerName = botNames.random(),
-                    isBot = true
-                )
-            )
-        } else if (eventRoll <= 5 && listings.isNotEmpty()) {
-            // Event 2: Bot buys a random active listing (could be user's listing!)
-            // Pick a random listing
-            val listingToBuy = listings.random()
-            
-            if (listingToBuy.sellerName == "User (You)") {
-                // Yay, user sold a card to a bot!
-                // 1. Delete listing from market
-                dao.deleteMarketListing(listingToBuy)
+            val eventRoll = Random.nextInt(1, 10)
 
-                // 2. Remove ownership of card from user (find the listed card)
-                val userCards = dao.getMintedCards().firstOrNull() ?: emptyList()
-                val userCard = userCards.firstOrNull { 
-                    it.cardIndex == listingToBuy.cardIndex && 
-                    it.mintNumber == listingToBuy.mintNumber && 
-                    it.isListed 
-                }
-                if (userCard != null) {
-                    dao.deleteMintedCard(userCard)
-                }
+            if (eventRoll <= 3 && listings.size < 15) {
+                val randomCardIndex = CyberTarotDeck.cards.random().index
+                val card = CyberTarotDeck.getCard(randomCardIndex)
+                val basePrice = getBaseMarketPrice(card.defaultRarity)
+                val markup = Random.nextInt(-25, 35)
+                val price = (basePrice + markup).coerceAtLeast(15)
 
-                // 3. Credit user's wallet
-                val profile = dao.getUserProfileSync() ?: UserProfile()
-                val updatedProfile = profile.copy(
-                    weed = profile.weed + listingToBuy.price,
-                    totalTrades = profile.totalTrades + 1
-                )
-                dao.updateProfile(updatedProfile)
-
-                // 4. Log transaction
-                dao.insertTransactionLog(
-                    TransactionLog(
-                        cardIndex = listingToBuy.cardIndex,
-                        rarity = listingToBuy.rarity,
-                        price = listingToBuy.price,
-                        type = "SOLD_TO_BOT",
-                        targetParty = botNames.random(),
-                        timestamp = System.currentTimeMillis()
+                dao.insertMarketListing(
+                    MarketListing(
+                        cardIndex = randomCardIndex,
+                        rarity = card.defaultRarity,
+                        mintNumber = Random.nextInt(100, 9999),
+                        price = price,
+                        sellerName = botNames.random(),
+                        isBot = true
                     )
                 )
-            } else {
-                // Bot bought another bot's card, clean up listing to rotate market
-                dao.deleteMarketListing(listingToBuy)
+            } else if (eventRoll <= 5 && listings.isNotEmpty()) {
+                val listingToBuy = listings.random()
+
+                if (listingToBuy.sellerName == "User (You)") {
+                    dao.deleteMarketListing(listingToBuy)
+
+                    val userCards = dao.getMintedCards().firstOrNull() ?: emptyList()
+                    val userCard = userCards.firstOrNull {
+                        it.cardIndex == listingToBuy.cardIndex &&
+                            it.mintNumber == listingToBuy.mintNumber &&
+                            it.isListed
+                    }
+                    if (userCard != null) {
+                        dao.deleteMintedCard(userCard)
+                    }
+
+                    val profile = dao.getUserProfileSync() ?: UserProfile()
+                    val updatedProfile = profile.copy(
+                        weed = profile.weed + listingToBuy.price,
+                        totalTrades = profile.totalTrades + 1
+                    )
+                    dao.updateProfile(updatedProfile)
+
+                    dao.insertTransactionLog(
+                        TransactionLog(
+                            cardIndex = listingToBuy.cardIndex,
+                            rarity = listingToBuy.rarity,
+                            price = listingToBuy.price,
+                            type = "SOLD_TO_BOT",
+                            targetParty = botNames.random(),
+                            timestamp = System.currentTimeMillis()
+                        )
+                    )
+                } else {
+                    dao.deleteMarketListing(listingToBuy)
+                }
             }
         }
     }
 
-    // Secure user profile with BIP39 seed phrase and 8-digit PIN
+    private suspend fun migrateLegacySecretsIfNeeded(profile: UserProfile) {
+        var needsUpdate = false
+        var newPinCode = profile.pinCode
+        var newSafePin = profile.pinSafeMode
+        var newSeed = profile.seedPhrase
+        var newProxy = profile.proxyConfig
+
+        if (newPinCode.isNotBlank() && !CryptoHelper.isPinHashed(newPinCode)) {
+            newPinCode = CryptoHelper.hashPin(newPinCode)
+            needsUpdate = true
+        }
+        if (!newSafePin.isNullOrBlank() && !CryptoHelper.isPinHashed(newSafePin)) {
+            newSafePin = CryptoHelper.hashPin(newSafePin)
+            needsUpdate = true
+        }
+        if (newSeed.isNotBlank() && !SecureVaultHelper.isEncrypted(newSeed)) {
+            newSeed = SecureVaultHelper.encryptSecret(appContext, newSeed)
+            needsUpdate = true
+        }
+        if (newProxy.isNotBlank() && !SecureVaultHelper.isEncrypted(newProxy)) {
+            newProxy = SecureVaultHelper.encryptSecret(appContext, newProxy)
+            needsUpdate = true
+        }
+        if (profile.securedDob.isNotEmpty() || profile.securedFirst.isNotEmpty() || profile.securedLast.isNotEmpty() || profile.pinPanicMode != null) {
+            needsUpdate = true
+        }
+
+        if (needsUpdate) {
+            database.withTransaction {
+                dao.updateProfile(
+                    profile.copy(
+                        pinCode = newPinCode,
+                        pinSafeMode = newSafePin,
+                        pinPanicMode = null,
+                        seedPhrase = newSeed,
+                        proxyConfig = newProxy,
+                        securedDob = "",
+                        securedFirst = "",
+                        securedLast = ""
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun getDecryptedSeedPhrase(): String = withContext(Dispatchers.IO) {
+        val stored = dao.getUserProfileSync()?.seedPhrase.orEmpty()
+        SecureVaultHelper.decryptSecret(appContext, stored)
+    }
+
+    fun decryptProxyConfig(stored: String): String {
+        return SecureVaultHelper.decryptSecret(appContext, stored)
+    }
+
+    fun getDevicePublicKeyBase64(): String {
+        return SecureVaultHelper.getOrCreateDeviceEcKeyPair(appContext).publicKeyBase64
+    }
+
+    suspend fun verifyPrimaryPin(candidatePin: String): Boolean = withContext(Dispatchers.IO) {
+        val profile = dao.getUserProfileSync() ?: return@withContext false
+        if (profile.pinCode.isBlank()) return@withContext true
+        val ok = CryptoHelper.verifyPin(candidatePin, profile.pinCode)
+        if (ok && !CryptoHelper.isPinHashed(profile.pinCode)) {
+            migrateLegacySecretsIfNeeded(profile)
+        }
+        ok
+    }
+
+    suspend fun verifySafePin(candidatePin: String): Boolean = withContext(Dispatchers.IO) {
+        val profile = dao.getUserProfileSync() ?: return@withContext false
+        val storedSafe = profile.pinSafeMode ?: return@withContext false
+        if (storedSafe.isBlank()) return@withContext false
+        val ok = CryptoHelper.verifyPin(candidatePin, storedSafe)
+        if (ok && !CryptoHelper.isPinHashed(storedSafe)) {
+            migrateLegacySecretsIfNeeded(profile)
+        }
+        ok
+    }
+
+    // Secure user profile with Keystore-encrypted BIP39 seed phrase and salted PBKDF2 PIN hash (no plaintext PII)
     suspend fun saveSecuredProfile(
         dob: String,
         first: String,
@@ -1228,32 +1318,45 @@ class TarotRepository private constructor(context: Context) {
         aliasVal: String = "",
         avatarIdx: Int = 0
     ) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        val updated = profile.copy(
-            isSecured = true,
-            securedDob = dob,
-            securedFirst = first,
-            securedLast = last,
-            seedPhrase = seed,
-            pinCode = pin,
-            pinSafeMode = pinSafe,
-            pinPanicMode = pinPanic,
-            alias = if (aliasVal.isNotBlank()) aliasVal else first,
-            avatarIndex = avatarIdx,
-            username = "${first.trim().replaceFirstChar { it.uppercase() }}_Secure"
-        )
-        dao.updateProfile(updated)
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val hashedPin = if (pin.isNotBlank()) CryptoHelper.hashPin(pin) else ""
+            val hashedSafePin = if (!pinSafe.isNullOrBlank()) CryptoHelper.hashPin(pinSafe) else null
+            val encryptedSeed = SecureVaultHelper.encryptSecret(appContext, seed)
+            val resolvedAlias = when {
+                aliasVal.isNotBlank() -> aliasVal.trim()
+                first.isNotBlank() -> first.trim()
+                else -> profile.alias
+            }
 
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = -3, // Security update
-                rarity = "Secure",
-                price = 0,
-                type = "SECURE_CREDENTIALS",
-                targetParty = "BIP39 Entropy Core",
-                timestamp = System.currentTimeMillis()
+            val updated = profile.copy(
+                isSecured = true,
+                securedDob = "",
+                securedFirst = "",
+                securedLast = "",
+                seedPhrase = encryptedSeed,
+                pinCode = hashedPin,
+                pinSafeMode = hashedSafePin,
+                pinPanicMode = null,
+                alias = resolvedAlias,
+                avatarIndex = avatarIdx,
+                username = "${resolvedAlias.replace(" ", "_").replaceFirstChar { it.uppercase() }}_Secure"
             )
-        )
+            dao.updateProfile(updated)
+
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = -3,
+                    rarity = "Secure",
+                    price = 0,
+                    type = "SECURE_CREDENTIALS",
+                    targetParty = "Keystore & PBKDF2 Core",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        }
+        SecureVaultHelper.resetPinLockout(appContext)
+        channelKeyCache.clear()
     }
 
     suspend fun logFailedSecurityAttempt(pinLength: Int) = withContext(Dispatchers.IO) {
@@ -1269,173 +1372,183 @@ class TarotRepository private constructor(context: Context) {
         )
     }
 
-    // Completely wipe all database tables and reinitialize base settings
     suspend fun triggerPanicResetComplete() = withContext(Dispatchers.IO) {
         database.clearAllTables()
+        SecureVaultHelper.resetPinLockout(appContext)
+        channelKeyCache.clear()
         ensureUserProfileAndMarketInitialized()
     }
 
-    // Reset secure profile details
     suspend fun resetSecurity() = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        val updated = profile.copy(
-            isSecured = false,
-            securedDob = "",
-            securedFirst = "",
-            securedLast = "",
-            seedPhrase = "",
-            pinCode = "",
-            username = "Netrunner_01"
-        )
-        dao.updateProfile(updated)
-
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = -4,
-                rarity = "System",
-                price = 0,
-                type = "SECURITY_RESET",
-                targetParty = "Local Storage Only",
-                timestamp = System.currentTimeMillis()
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val updated = profile.copy(
+                isSecured = false,
+                securedDob = "",
+                securedFirst = "",
+                securedLast = "",
+                seedPhrase = "",
+                pinCode = "",
+                pinSafeMode = null,
+                pinPanicMode = null,
+                username = "Netrunner_01"
             )
-        )
+            dao.updateProfile(updated)
+
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = -4,
+                    rarity = "System",
+                    price = 0,
+                    type = "SECURITY_RESET",
+                    targetParty = "Local Storage Only",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        }
+        SecureVaultHelper.resetPinLockout(appContext)
+        channelKeyCache.clear()
     }
 
-    // Update proxy settings (Tor, VPN, V2Ray, SOCKS5)
     suspend fun updateProxySettings(type: String, host: String, port: Int, config: String, active: Boolean) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        val updated = profile.copy(
-            proxyType = type,
-            proxyHost = host,
-            proxyPort = port,
-            proxyConfig = config,
-            isProxyActive = active
-        )
-        dao.updateProfile(updated)
-    }
-
-    // Update language selection
-    suspend fun updateSystemLanguage(lang: String) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        val updated = profile.copy(systemLanguage = lang)
-        dao.updateProfile(updated)
-    }
-
-    // Update decentralized cloud allocation
-    suspend fun updateCloudAllocation(allocated: Boolean, spaceGb: Float) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        val updated = profile.copy(
-            isCloudAllocated = allocated,
-            allocatedDiskSpaceGb = spaceGb
-        )
-        dao.updateProfile(updated)
-
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = -5,
-                rarity = "Cloud",
-                price = if (allocated) 100 else 0, // reward 100 credits for joining!
-                type = if (allocated) "CLOUD_ALLOCATE" else "CLOUD_DEALLOCATE",
-                targetParty = "P2P Network Broker",
-                timestamp = System.currentTimeMillis()
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val encryptedConfig = SecureVaultHelper.encryptSecret(appContext, config)
+            val updated = profile.copy(
+                proxyType = type,
+                proxyHost = host,
+                proxyPort = port,
+                proxyConfig = encryptedConfig,
+                isProxyActive = active
             )
-        )
-        
-        if (allocated) {
-            // Add credits if allocating
-            val finalProfile = updated.copy(weed = updated.weed + 100)
-            dao.updateProfile(finalProfile)
+            dao.updateProfile(updated)
         }
     }
 
-    // --- NEW CRYPTO, P2P & BRIDGE METHODS ---
+    suspend fun updateSystemLanguage(lang: String) = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            dao.updateProfile(profile.copy(systemLanguage = lang))
+        }
+    }
 
-    // --- TOKENIZED ASSETS METHODS ---
+    // Idempotent local storage allocation reward: one-time +100 WEED only when !cloudRewardClaimed (H3)
+    suspend fun updateCloudAllocation(allocated: Boolean, spaceGb: Float): Boolean = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val grantFirstTimeBonus = allocated && !profile.cloudRewardClaimed
+            val bonusAmount = if (grantFirstTimeBonus) 100 else 0
+
+            val updated = profile.copy(
+                isCloudAllocated = allocated,
+                allocatedDiskSpaceGb = if (allocated) spaceGb else 0f,
+                weed = profile.weed + bonusAmount,
+                cloudRewardClaimed = profile.cloudRewardClaimed || grantFirstTimeBonus
+            )
+            dao.updateProfile(updated)
+
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = -5,
+                    rarity = "Cloud",
+                    price = bonusAmount,
+                    type = if (allocated) "CLOUD_ALLOCATE" else "CLOUD_DEALLOCATE",
+                    targetParty = "Local Storage Container",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+            grantFirstTimeBonus
+        }
+    }
+
     suspend fun performAssetTransaction(
-        assetName: String, // "ETH", "TON", "SOL", "TRX", "USDC"
-        amount: Double,    // Positive for deposit/swap-in, negative for send/swap-out
-        type: String,      // "DEPOSIT", "SEND", "SWAP"
+        assetName: String,
+        amount: Double,
+        type: String,
         destinationAddress: String = ""
     ): Boolean = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: return@withContext false
-        val updated = when (assetName.uppercase()) {
-            "ETH" -> {
-                if (amount < 0 && profile.balanceEth < -amount) return@withContext false
-                profile.copy(balanceEth = (profile.balanceEth + amount).coerceAtLeast(0.0))
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: return@withTransaction false
+            val updated = when (assetName.uppercase()) {
+                "ETH" -> {
+                    if (amount < 0 && profile.balanceEth < -amount) return@withTransaction false
+                    profile.copy(balanceEth = (profile.balanceEth + amount).coerceAtLeast(0.0))
+                }
+                "TON" -> {
+                    if (amount < 0 && profile.balanceTon < -amount) return@withTransaction false
+                    profile.copy(balanceTon = (profile.balanceTon + amount).coerceAtLeast(0.0))
+                }
+                "SOL" -> {
+                    if (amount < 0 && profile.balanceSol < -amount) return@withTransaction false
+                    profile.copy(balanceSol = (profile.balanceSol + amount).coerceAtLeast(0.0))
+                }
+                "TRX" -> {
+                    if (amount < 0 && profile.balanceTrx < -amount) return@withTransaction false
+                    profile.copy(balanceTrx = (profile.balanceTrx + amount).coerceAtLeast(0.0))
+                }
+                "USDC" -> {
+                    if (amount < 0 && profile.balanceUsdc < -amount) return@withTransaction false
+                    profile.copy(balanceUsdc = (profile.balanceUsdc + amount).coerceAtLeast(0.0))
+                }
+                else -> return@withTransaction false
             }
-            "TON" -> {
-                if (amount < 0 && profile.balanceTon < -amount) return@withContext false
-                profile.copy(balanceTon = (profile.balanceTon + amount).coerceAtLeast(0.0))
-            }
-            "SOL" -> {
-                if (amount < 0 && profile.balanceSol < -amount) return@withContext false
-                profile.copy(balanceSol = (profile.balanceSol + amount).coerceAtLeast(0.0))
-            }
-            "TRX" -> {
-                if (amount < 0 && profile.balanceTrx < -amount) return@withContext false
-                profile.copy(balanceTrx = (profile.balanceTrx + amount).coerceAtLeast(0.0))
-            }
-            "USDC" -> {
-                if (amount < 0 && profile.balanceUsdc < -amount) return@withContext false
-                profile.copy(balanceUsdc = (profile.balanceUsdc + amount).coerceAtLeast(0.0))
-            }
-            else -> return@withContext false
+            dao.updateProfile(updated)
+            true
         }
-        dao.updateProfile(updated)
-        return@withContext true
     }
 
     suspend fun swapAssets(
-        fromAsset: String, // "WEED", "ETH", "TON", etc.
+        fromAsset: String,
         toAsset: String,
         fromAmount: Double,
         toAmount: Double
     ): Boolean = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: return@withContext false
-        var updated = profile
+        if (fromAmount <= 0.0 || toAmount <= 0.0) return@withContext false
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: return@withTransaction false
+            var updated = profile
 
-        // Deduct fromAsset
-        when (fromAsset.uppercase()) {
-            "WEED", "CREDITS" -> {
-                if (profile.weed < fromAmount.toInt()) return@withContext false
-                updated = updated.copy(weed = profile.weed - fromAmount.toInt())
+            when (fromAsset.uppercase()) {
+                "WEED", "CREDITS" -> {
+                    if (profile.weed < fromAmount.toInt()) return@withTransaction false
+                    updated = updated.copy(weed = profile.weed - fromAmount.toInt())
+                }
+                "ETH" -> {
+                    if (profile.balanceEth < fromAmount) return@withTransaction false
+                    updated = updated.copy(balanceEth = profile.balanceEth - fromAmount)
+                }
+                "TON" -> {
+                    if (profile.balanceTon < fromAmount) return@withTransaction false
+                    updated = updated.copy(balanceTon = profile.balanceTon - fromAmount)
+                }
+                "SOL" -> {
+                    if (profile.balanceSol < fromAmount) return@withTransaction false
+                    updated = updated.copy(balanceSol = profile.balanceSol - fromAmount)
+                }
+                "TRX" -> {
+                    if (profile.balanceTrx < fromAmount) return@withTransaction false
+                    updated = updated.copy(balanceTrx = profile.balanceTrx - fromAmount)
+                }
+                "USDC" -> {
+                    if (profile.balanceUsdc < fromAmount) return@withTransaction false
+                    updated = updated.copy(balanceUsdc = profile.balanceUsdc - fromAmount)
+                }
+                else -> return@withTransaction false
             }
-            "ETH" -> {
-                if (profile.balanceEth < fromAmount) return@withContext false
-                updated = updated.copy(balanceEth = profile.balanceEth - fromAmount)
+
+            updated = when (toAsset.uppercase()) {
+                "WEED", "CREDITS" -> updated.copy(weed = updated.weed + toAmount.toInt())
+                "ETH" -> updated.copy(balanceEth = updated.balanceEth + toAmount)
+                "TON" -> updated.copy(balanceTon = updated.balanceTon + toAmount)
+                "SOL" -> updated.copy(balanceSol = updated.balanceSol + toAmount)
+                "TRX" -> updated.copy(balanceTrx = updated.balanceTrx + toAmount)
+                "USDC" -> updated.copy(balanceUsdc = updated.balanceUsdc + toAmount)
+                else -> return@withTransaction false
             }
-            "TON" -> {
-                if (profile.balanceTon < fromAmount) return@withContext false
-                updated = updated.copy(balanceTon = profile.balanceTon - fromAmount)
-            }
-            "SOL" -> {
-                if (profile.balanceSol < fromAmount) return@withContext false
-                updated = updated.copy(balanceSol = profile.balanceSol - fromAmount)
-            }
-            "TRX" -> {
-                if (profile.balanceTrx < fromAmount) return@withContext false
-                updated = updated.copy(balanceTrx = profile.balanceTrx - fromAmount)
-            }
-            "USDC" -> {
-                if (profile.balanceUsdc < fromAmount) return@withContext false
-                updated = updated.copy(balanceUsdc = profile.balanceUsdc - fromAmount)
-            }
-            else -> return@withContext false
+
+            dao.updateProfile(updated)
+            true
         }
-
-        // Add toAsset
-        updated = when (toAsset.uppercase()) {
-            "WEED", "CREDITS" -> updated.copy(weed = updated.weed + toAmount.toInt())
-            "ETH" -> updated.copy(balanceEth = updated.balanceEth + toAmount)
-            "TON" -> updated.copy(balanceTon = updated.balanceTon + toAmount)
-            "SOL" -> updated.copy(balanceSol = updated.balanceSol + toAmount)
-            "TRX" -> updated.copy(balanceTrx = updated.balanceTrx + toAmount)
-            "USDC" -> updated.copy(balanceUsdc = updated.balanceUsdc + toAmount)
-            else -> return@withContext false
-        }
-
-        dao.updateProfile(updated)
-        return@withContext true
     }
 
     suspend fun addPeerContact(name: String, onionAddress: String, publicKey: String) = withContext(Dispatchers.IO) {
@@ -1446,24 +1559,47 @@ class TarotRepository private constructor(context: Context) {
         val contact = dao.getPeerContactById(contactId)
         if (contact != null) {
             dao.deletePeerContact(contact)
+            channelKeyCache.keys.removeIf { it.startsWith("${contactId}_") }
         }
     }
 
+    private suspend fun resolveChannelSecretKey(contactId: Int, contactPublicKey: String): SecretKeySpec {
+        val cacheKey = "${contactId}_$contactPublicKey"
+        channelKeyCache[cacheKey]?.let { return it }
+
+        val deviceEcPair = SecureVaultHelper.getOrCreateDeviceEcKeyPair(appContext)
+        // Prefer true ECDH P-256 + HKDF-SHA256 when peer provides a valid X.509 EC public key
+        val derived = runCatching {
+            CryptoHelper.deriveSharedChannelKey(
+                localPrivateKeyBase64 = deviceEcPair.privateKeyBase64,
+                peerPublicKeyBase64 = contactPublicKey,
+                contextInfo = "WEEDGURU_CHANNEL_${contactId}"
+            )
+        }.getOrNull() ?: run {
+            val decryptedSeed = getDecryptedSeedPhrase()
+            val effectiveMaster = if (decryptedSeed.isNotBlank()) {
+                decryptedSeed
+            } else {
+                Base64.encodeToString(SecureVaultHelper.getOrCreateSwarmClusterKey(appContext), Base64.NO_WRAP)
+            }
+            CryptoHelper.deriveChannelKey(effectiveMaster, contactId, contactPublicKey)
+        }
+
+        channelKeyCache[cacheKey] = derived
+        return derived
+    }
+
     suspend fun getChannelSecretKey(contactId: Int): SecretKeySpec = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync()
         val contact = dao.getPeerContactById(contactId)
-        val masterSeed = profile?.seedPhrase.orEmpty()
         val contactPubKey = contact?.publicKey ?: "0x00"
-        CryptoHelper.deriveChannelKey(masterSeed, contactId, contactPubKey)
+        resolveChannelSecretKey(contactId, contactPubKey)
     }
 
     fun getEncryptedMessages(contactId: Int): Flow<List<EncryptedMessage>> {
         return dao.getEncryptedMessagesForContact(contactId).map { messages ->
-            val profile = dao.getUserProfileSync()
             val contact = dao.getPeerContactById(contactId)
-            val masterSeed = profile?.seedPhrase.orEmpty()
             val contactPubKey = contact?.publicKey ?: "0x00"
-            val secretKey = CryptoHelper.deriveChannelKey(masterSeed, contactId, contactPubKey)
+            val secretKey = resolveChannelSecretKey(contactId, contactPubKey)
 
             messages.map { msg ->
                 val decryptedResult = CryptoHelper.decryptAesGcm(msg.ciphertext, msg.iv, secretKey)
@@ -1476,16 +1612,14 @@ class TarotRepository private constructor(context: Context) {
     }
 
     suspend fun sendEncryptedMessage(contactId: Int, senderName: String, plaintext: String, aesKey: String? = null) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync()
         val contact = dao.getPeerContactById(contactId)
-        val masterSeed = profile?.seedPhrase.orEmpty()
         val contactPubKey = contact?.publicKey ?: "0x00"
         val secretKey = if (!aesKey.isNullOrBlank() && !aesKey.startsWith("SECURE_KEY_CH_")) {
-            val md = MessageDigest.getInstance("SHA-256")
-            val keyBytes = md.digest(aesKey.toByteArray(Charsets.UTF_8))
-            SecretKeySpec(keyBytes, "AES")
+            val salt = MessageDigest.getInstance("SHA-256")
+                .digest("WEEDGURU_CUSTOM_CHANNEL_SALT".toByteArray(Charsets.UTF_8))
+            CryptoHelper.deriveKeyPbkdf2(aesKey.toCharArray(), salt, 50_000)
         } else {
-            CryptoHelper.deriveChannelKey(masterSeed, contactId, contactPubKey)
+            resolveChannelSecretKey(contactId, contactPubKey)
         }
 
         val encrypted = CryptoHelper.encryptAesGcm(plaintext, secretKey)
@@ -1500,18 +1634,16 @@ class TarotRepository private constructor(context: Context) {
             )
         )
 
-        // Trigger realistic automated peer response after network processing delay
-        val responderName = contact?.name ?: "Remote Peer"
-        val onionAddr = contact?.onionAddress ?: "unknown.onion"
+        val responderName = contact?.name ?: "Sandbox Peer"
+        val onionAddr = contact?.onionAddress ?: "sandbox.local"
 
-        // Decrypt recent messages from storage to maintain authentic context
         val messagesList = dao.getEncryptedMessagesForContact(contactId).firstOrNull() ?: emptyList()
         val recentHistory = messagesList.takeLast(10).map { msg ->
             val dec = CryptoHelper.decryptAesGcm(msg.ciphertext, msg.iv, secretKey).getOrElse { "[SECURE]" }
             Pair(msg.senderName, dec)
         }
 
-        val responsePlaintext = GeminiService.generatePeerResponse(
+        val responsePlaintext = "[SANDBOX LOCAL BOT] " + GeminiService.generatePeerResponse(
             peerName = responderName,
             peerOnion = onionAddr,
             userMessage = plaintext,
@@ -1563,6 +1695,12 @@ class TarotRepository private constructor(context: Context) {
         return digest.joinToString("") { String.format("%02x", it) }
     }
 
+    /**
+     * Honest Sandbox P2P Ledger Simulation (C3 & C6a):
+     * - Signs canonical transaction payload with ECDSA (SHA256withECDSA) using the device Keystore-protected EC keypair.
+     * - Does NOT permanently delete user's real Vault cards or deduct WEED while in offline simulation mode.
+     * - Wraps ledger + transaction log persistence inside an atomic Room transaction.
+     */
     suspend fun broadcastP2pTransaction(
         recipientAddress: String,
         amountWeed: Int,
@@ -1570,75 +1708,82 @@ class TarotRepository private constructor(context: Context) {
         mintNumber: Int,
         seedPhrase: String
     ): Pair<Boolean, String> = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        val senderAddress = profile.username
-        
-        if (amountWeed > 0 && profile.weed < amountWeed) {
-            return@withContext Pair(false, "TRANSACTION REJECTED: Insufficient Weed on terminal.")
+        if (recipientAddress.isBlank()) {
+            return@withContext Pair(false, "TRANSACTION REJECTED: Recipient node required.")
         }
-        
-        if (cardIndex != -1) {
-            val ownedCards = dao.getMintedCards().firstOrNull() ?: emptyList()
-            val ownedCard = ownedCards.find { it.cardIndex == cardIndex && it.mintNumber == mintNumber }
-            if (ownedCard == null) {
-                return@withContext Pair(false, "TRANSACTION REJECTED: Card serial #$mintNumber not found in hardware vault.")
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val senderAddress = profile.username
+
+            if (amountWeed < 0) {
+                return@withTransaction Pair(false, "TRANSACTION REJECTED: Amount cannot be negative.")
             }
-            dao.deleteMintedCard(ownedCard)
-        }
-        
-        if (amountWeed > 0) {
-            dao.updateProfile(profile.copy(weed = profile.weed - amountWeed))
-        }
-        
-        val lastBlock = dao.getP2pTransactions().firstOrNull()?.firstOrNull()
-        val blockNum = (lastBlock?.blockNumber ?: 0) + 1
-        val prevHash = lastBlock?.blockHash ?: "00000000000000000000000000000000"
-        var nonce = 0
-        var blockHash = ""
-        val baseData = "$blockNum$prevHash$senderAddress$recipientAddress$amountWeed$cardIndex$mintNumber"
-        
-        // Mine a block hash starting with "00"
-        while (nonce < 1000000) {
-            val hash = sha256("$baseData$nonce")
-            if (hash.startsWith("00")) {
-                blockHash = hash
-                break
+            if (amountWeed > 0 && profile.weed < amountWeed) {
+                return@withTransaction Pair(false, "TRANSACTION REJECTED: Insufficient Weed on terminal.")
             }
-            nonce++
-        }
-        if (blockHash.isEmpty()) {
-            blockHash = sha256(baseData + nonce)
-        }
-        
-        val signatureText = "SIG_" + sha256("$senderAddress$recipientAddress$amountWeed$seedPhrase").take(16)
-        
-        val tx = P2pTransaction(
-            blockNumber = blockNum,
-            previousHash = prevHash,
-            blockHash = blockHash,
-            nonce = nonce,
-            senderAddress = senderAddress,
-            recipientAddress = recipientAddress,
-            amountWeed = amountWeed,
-            cardIndex = cardIndex,
-            mintNumber = mintNumber,
-            signature = signatureText
-        )
-        
-        dao.insertP2pTransaction(tx)
-        
-        dao.insertTransactionLog(
-            TransactionLog(
-                cardIndex = cardIndex,
-                rarity = if (cardIndex != -1) "P2P_Card" else "P2P_Credits",
-                price = amountWeed,
-                type = "P2P_SEND",
-                targetParty = recipientAddress,
-                timestamp = System.currentTimeMillis()
+
+            if (cardIndex != -1) {
+                val ownedCards = dao.getMintedCards().firstOrNull() ?: emptyList()
+                val ownedCard = ownedCards.find { it.cardIndex == cardIndex && it.mintNumber == mintNumber }
+                if (ownedCard == null) {
+                    return@withTransaction Pair(false, "TRANSACTION REJECTED: Card serial #$mintNumber not found in hardware vault.")
+                }
+            }
+
+            val lastBlock = dao.getP2pTransactions().firstOrNull()?.firstOrNull()
+            val blockNum = (lastBlock?.blockNumber ?: 0) + 1
+            val prevHash = lastBlock?.blockHash ?: "00000000000000000000000000000000"
+            var nonce = 0
+            var blockHash = ""
+            val baseData = "$blockNum$prevHash$senderAddress$recipientAddress$amountWeed$cardIndex$mintNumber"
+
+            while (nonce < 100_000) {
+                val hash = sha256("$baseData$nonce")
+                if (hash.startsWith("00")) {
+                    blockHash = hash
+                    break
+                }
+                nonce++
+            }
+            if (blockHash.isEmpty()) {
+                blockHash = sha256(baseData + nonce)
+            }
+
+            val ecPair = SecureVaultHelper.getOrCreateDeviceEcKeyPair(appContext)
+            val canonicalPayload = "$blockNum|$prevHash|$blockHash|$senderAddress|$recipientAddress|$amountWeed|$cardIndex|$mintNumber"
+            val ecdsaSignature = CryptoHelper.signEcdsa(
+                canonicalPayload.toByteArray(Charsets.UTF_8),
+                ecPair.privateKeyBase64
             )
-        )
-        
-        Pair(true, blockHash)
+
+            val tx = P2pTransaction(
+                blockNumber = blockNum,
+                previousHash = prevHash,
+                blockHash = blockHash,
+                nonce = nonce,
+                senderAddress = senderAddress,
+                recipientAddress = "$recipientAddress [SANDBOX]",
+                amountWeed = amountWeed,
+                cardIndex = cardIndex,
+                mintNumber = mintNumber,
+                signature = "ECDSA_P256:$ecdsaSignature"
+            )
+
+            dao.insertP2pTransaction(tx)
+
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = cardIndex,
+                    rarity = if (cardIndex != -1) "Sandbox_Card" else "Sandbox_Credits",
+                    price = 0, // No real vault assets deducted in Sandbox simulation
+                    type = "P2P_SANDBOX_SIM",
+                    targetParty = "$recipientAddress (Simulated)",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+
+            Pair(true, blockHash)
+        }
     }
 
     suspend fun testBridgeConnection(host: String, port: Int, proxyType: String, testUrl: String = "https://www.google.com"): Pair<Boolean, String> = withContext(Dispatchers.IO) {
@@ -1664,72 +1809,86 @@ class TarotRepository private constructor(context: Context) {
     }
 
     suspend fun stakeWeed(amount: Int): Boolean = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: return@withContext false
-        if (profile.weed < amount) return@withContext false
-        val newStake = profile.nodeStake + amount
-        val updated = profile.copy(
-            weed = profile.weed - amount,
-            nodeStake = newStake
-        )
-        dao.updateProfile(updated)
-        true
+        if (amount <= 0) return@withContext false
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: return@withTransaction false
+            if (profile.weed < amount) return@withTransaction false
+            val updated = profile.copy(
+                weed = profile.weed - amount,
+                nodeStake = profile.nodeStake + amount
+            )
+            dao.updateProfile(updated)
+            true
+        }
     }
 
     suspend fun unstakeWeed(amount: Int): Boolean = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: return@withContext false
-        if (profile.nodeStake < amount) return@withContext false
-        val newStake = profile.nodeStake - amount
-        val updated = profile.copy(
-            weed = profile.weed + amount,
-            nodeStake = newStake
-        )
-        dao.updateProfile(updated)
-        true
+        if (amount <= 0) return@withContext false
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: return@withTransaction false
+            if (profile.nodeStake < amount) return@withTransaction false
+            val updated = profile.copy(
+                weed = profile.weed + amount,
+                nodeStake = profile.nodeStake - amount
+            )
+            dao.updateProfile(updated)
+            true
+        }
     }
 
     suspend fun updateNodeSpeed(speedMbps: Double) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: return@withContext
-        val updated = profile.copy(nodeBandwidthMbps = speedMbps)
-        dao.updateProfile(updated)
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: return@withTransaction
+            dao.updateProfile(profile.copy(nodeBandwidthMbps = speedMbps))
+        }
     }
 
     suspend fun updateNodeOnlineState(isOnline: Boolean) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: return@withContext
-        val updated = profile.copy(
-            nodeIsOnline = isOnline,
-            nodeLastActiveTime = if (isOnline) System.currentTimeMillis() else profile.nodeLastActiveTime
-        )
-        dao.updateProfile(updated)
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: return@withTransaction
+            dao.updateProfile(
+                profile.copy(
+                    nodeIsOnline = isOnline,
+                    nodeLastActiveTime = if (isOnline) System.currentTimeMillis() else profile.nodeLastActiveTime
+                )
+            )
+        }
     }
 
     suspend fun applyNodeOfflinePenalty(): Int = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: return@withContext 0
-        val slashedStake = profile.nodeStake / 2
-        val penalty = profile.nodeStake - slashedStake
-        val updated = profile.copy(
-            nodeStake = slashedStake,
-            nodeUptimeMinutes = 0,
-            nodeLastActiveTime = System.currentTimeMillis()
-        )
-        dao.updateProfile(updated)
-        penalty
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: return@withTransaction 0
+            val slashedStake = profile.nodeStake / 2
+            val penalty = profile.nodeStake - slashedStake
+            dao.updateProfile(
+                profile.copy(
+                    nodeStake = slashedStake,
+                    nodeUptimeMinutes = 0,
+                    nodeLastActiveTime = System.currentTimeMillis()
+                )
+            )
+            penalty
+        }
     }
 
     suspend fun incrementNodeUptime(minutes: Int) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: return@withContext
-        val updated = profile.copy(nodeUptimeMinutes = profile.nodeUptimeMinutes + minutes)
-        dao.updateProfile(updated)
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: return@withTransaction
+            dao.updateProfile(profile.copy(nodeUptimeMinutes = profile.nodeUptimeMinutes + minutes))
+        }
     }
 
     suspend fun updateUserProfileSetup(alias: String, avatarIndex: Int, bio: String, customAvatarUri: String? = null) = withContext(Dispatchers.IO) {
-        val profile = dao.getUserProfileSync() ?: UserProfile()
-        val updated = profile.copy(
-            alias = alias,
-            avatarIndex = avatarIndex,
-            bio = bio,
-            customAvatarUri = customAvatarUri
-        )
-        dao.updateProfile(updated)
+        database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val updated = profile.copy(
+                alias = alias,
+                avatarIndex = avatarIndex,
+                bio = bio,
+                customAvatarUri = customAvatarUri
+            )
+            dao.updateProfile(updated)
+        }
     }
 
     suspend fun updateProfile(profile: UserProfile) = withContext(Dispatchers.IO) {

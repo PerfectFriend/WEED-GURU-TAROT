@@ -114,3 +114,52 @@ test("Market listings: user cannot update another user's listing", async () => {
     aliceDb.collection("market").doc("listing_2").update({ price: 100 })
   );
 });
+
+test("User profile: client cannot inflate weed balance on create or update", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).set({
+      userId: ALICE_UID,
+      username: "Alice",
+      weed: 999999
+    })
+  );
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).set({
+      userId: ALICE_UID,
+      username: "Alice",
+      weed: 500
+    })
+  );
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).update({ weed: 1000 })
+  );
+});
+
+test("Market listings: buyer can purchase unsold listing without altering price", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("market").doc("listing_buy").set({
+      id: "listing_buy",
+      sellerId: ALICE_UID,
+      cardIndex: 2,
+      price: 300,
+      timestamp: Date.now(),
+      isSold: false
+    });
+  });
+
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  await assertFails(
+    bobDb.collection("market").doc("listing_buy").update({
+      isSold: true,
+      buyerId: BOB_UID,
+      price: 1
+    })
+  );
+  await assertSucceeds(
+    bobDb.collection("market").doc("listing_buy").update({
+      isSold: true,
+      buyerId: BOB_UID
+    })
+  );
+});

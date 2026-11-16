@@ -1,21 +1,47 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Cyber Tarot / WEED GURU ProGuard & R8 Keep Rules (H5)
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep Room entities & DAOs
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-keepclassmembers class * {
+    @androidx.room.* <fields>;
+    @androidx.room.* <methods>;
+}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep Moshi / Retrofit JSON-RPC DTOs & Kotlin metadata
+-keep class kotlin.Metadata { *; }
+-keepclassmembers class com.example.data.JsonRpcRequest { *; }
+-keepclassmembers class com.example.data.JsonRpcResponse { *; }
+-keepclassmembers class com.example.data.JsonRpcError { *; }
+-keepclassmembers class * {
+    @com.squareup.moshi.Json <fields>;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Retrofit interface methods
+-keepattributes Signature, InnerClasses, EnclosingMethod
+-keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
+-keepclassmembers,allowshrinking,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
+}
+
+# Strip verbose debug logs in minified builds
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+}
+
+# Keep Firebase Firestore / Auth models & SDK reflection
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+-keepclassmembers class com.example.data.* { *; }
+
+# Keep Jetpack Credential Manager & Google Identity
+-keep class androidx.credentials.** { *; }
+-keep class com.google.android.libraries.identity.googleid.** { *; }
+-dontwarn androidx.credentials.**
+
+# Keep Kotlin Coroutines debug/service loader
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-dontwarn kotlinx.coroutines.**
+

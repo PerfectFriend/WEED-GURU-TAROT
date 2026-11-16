@@ -415,9 +415,9 @@ fun DuelArenaScreen(
         }
 
         // Victory / Defeat Overlay Dialog
-        if (duelState.winner != null) {
+        duelState.winner?.let { duelWinner ->
             DuelResultDialog(
-                winner = duelState.winner!!,
+                winner = duelWinner,
                 lang = lang,
                 primaryColor = currentSkin.primaryColor,
                 onRestart = {
