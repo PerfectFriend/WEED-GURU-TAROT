@@ -165,9 +165,14 @@ class TarotRepository private constructor(context: Context) {
     }
 
     init {
+        WatermarkStateStore.init(appContext)
+        WatermarkStateStore.registerPurchaseHandler { payWithUsdc ->
+            purchaseGenesisWatermarkEliminator(payWithUsdc)
+        }
         // Initialize first launch data on a background thread
         CoroutineScope(Dispatchers.IO).launch {
             ensureUserProfileAndMarketInitialized()
+            dao.getMintedCards().firstOrNull()?.let { WatermarkStateStore.syncOwnedCards(it) }
         }
     }
 
@@ -1158,8 +1163,77 @@ class TarotRepository private constructor(context: Context) {
                 )
             )
 
+            if (listing.cardIndex == CyberTarotDeck.GENESIS_ELIMINATOR_INDEX) {
+                WatermarkStateStore.unlockAndHide(appContext)
+            }
             true
         }
+    }
+
+    /**
+     * Purchase Collectible Card #31 (GENESIS WATERMARK ELIMINATOR) for the equivalent of $5.99
+     * (5.99 USDC at 1:1 USD peg or 60 WEED at 1 USDC = 10 WEED), unlocking the option
+     * to hide/show the fullscreen WEED GURU PROPERTY watermark.
+     */
+    suspend fun purchaseGenesisWatermarkEliminator(payWithUsdc: Boolean = true): Boolean = withContext(Dispatchers.IO) {
+        val purchased = database.withTransaction {
+            val profile = dao.getUserProfileSync() ?: UserProfile()
+            val existingCards = dao.getMintedCards().firstOrNull() ?: emptyList()
+            if (existingCards.any { it.cardIndex == CyberTarotDeck.GENESIS_ELIMINATOR_INDEX }) {
+                return@withTransaction true
+            }
+
+            if (payWithUsdc) {
+                if (profile.balanceUsdc < CyberTarotDeck.GENESIS_ELIMINATOR_USD_PRICE) {
+                    return@withTransaction false
+                }
+                dao.updateProfile(
+                    profile.copy(
+                        balanceUsdc = profile.balanceUsdc - CyberTarotDeck.GENESIS_ELIMINATOR_USD_PRICE,
+                        totalMints = profile.totalMints + 1,
+                        totalTrades = profile.totalTrades + 1
+                    )
+                )
+            } else {
+                if (profile.weed < CyberTarotDeck.GENESIS_ELIMINATOR_WEED_EQUIVALENT) {
+                    return@withTransaction false
+                }
+                dao.updateProfile(
+                    profile.copy(
+                        weed = profile.weed - CyberTarotDeck.GENESIS_ELIMINATOR_WEED_EQUIVALENT,
+                        totalMints = profile.totalMints + 1,
+                        totalTrades = profile.totalTrades + 1
+                    )
+                )
+            }
+
+            dao.insertMintedCard(
+                MintedCard(
+                    cardIndex = CyberTarotDeck.GENESIS_ELIMINATOR_INDEX,
+                    rarity = "Genesis",
+                    mintNumber = Random.nextInt(1, 9999),
+                    timestamp = System.currentTimeMillis(),
+                    isListed = false,
+                    listPrice = 0
+                )
+            )
+
+            dao.insertTransactionLog(
+                TransactionLog(
+                    cardIndex = CyberTarotDeck.GENESIS_ELIMINATOR_INDEX,
+                    rarity = "Genesis",
+                    price = CyberTarotDeck.GENESIS_ELIMINATOR_WEED_EQUIVALENT,
+                    type = "BUY",
+                    targetParty = if (payWithUsdc) "Genesis Mint (\$5.99 USDC)" else "Genesis Mint (60 WEED)",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+            true
+        }
+        if (purchased) {
+            WatermarkStateStore.unlockAndHide(appContext)
+        }
+        purchased
     }
 
     // Trigger random market events (bots buying or listing new cards)

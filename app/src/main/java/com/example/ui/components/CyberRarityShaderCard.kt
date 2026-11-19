@@ -9,22 +9,24 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.ui.theme.*
 import kotlin.math.*
-import kotlin.random.Random
 
 /**
  * Normalized rarity categories supported across Cyber Tarot.
@@ -64,76 +66,76 @@ data class RarityShaderPalette(
 
 object CyberRarityPalettes {
     val Common = RarityShaderPalette(
-        primary = Color(0xFF00FF66), // Neon Emerald
-        secondary = Color(0xFF008833),
-        accent = Color(0xFF88FFAA),
-        darkBase = Color(0xFF041208),
-        glowColor = Color(0x3300FF66),
-        borderColors = listOf(Color(0xFF00FF66), Color(0xFF005522), Color(0xFF00FF66)),
-        holographicColors = listOf(Color(0xFF00FF66), Color(0xFF33FFAA), Color(0xFF00AA44))
+        primary = EmeraldPure,
+        secondary = EmeraldLife,
+        accent = EmeraldGlow,
+        darkBase = InkDeep,
+        glowColor = EmeraldPure.copy(alpha = 0.20f),
+        borderColors = listOf(EmeraldPure, EmeraldLife, EmeraldPure),
+        holographicColors = listOf(EmeraldPure, EmeraldGlow, EmeraldLife)
     )
 
     val Rare = RarityShaderPalette(
-        primary = Color(0xFF00F5FF), // Electric Cyan
-        secondary = Color(0xFF0055FF), // Pulse Blue
-        accent = Color(0xFF80FAFF),
-        darkBase = Color(0xFF030D1A),
-        glowColor = Color(0x4400F5FF),
-        borderColors = listOf(Color(0xFF00F5FF), Color(0xFF0044BB), Color(0xFF00F5FF)),
-        holographicColors = listOf(Color(0xFF00F5FF), Color(0xFF0088FF), Color(0xFF44FFFF))
+        primary = NeonCyan,
+        secondary = BlueElectric,
+        accent = CyanLight,
+        darkBase = InkDeep,
+        glowColor = NeonCyan.copy(alpha = 0.27f),
+        borderColors = listOf(NeonCyan, BlueElectric, NeonCyan),
+        holographicColors = listOf(NeonCyan, BlueElectric, CyanLight)
     )
 
     val Epic = RarityShaderPalette(
-        primary = Color(0xFFBD00FF), // Ultraviolet Magenta
-        secondary = Color(0xFFFF007F), // Neon Pink
-        accent = Color(0xFFE088FF),
-        darkBase = Color(0xFF140321),
-        glowColor = Color(0x55BD00FF),
-        borderColors = listOf(Color(0xFFBD00FF), Color(0xFFFF007F), Color(0xFFBD00FF)),
+        primary = NeonPurple,
+        secondary = NeonMagenta,
+        accent = ElegantViolet,
+        darkBase = PanelDark,
+        glowColor = NeonPurple.copy(alpha = 0.33f),
+        borderColors = listOf(NeonPurple, NeonMagenta, NeonPurple),
         holographicColors = listOf(
-            Color(0xFFFF007F),
-            Color(0xFFBD00FF),
-            Color(0xFF00F5FF),
-            Color(0xFFFFD700),
-            Color(0xFFFF007F)
+            NeonMagenta,
+            NeonPurple,
+            NeonCyan,
+            SolarGold,
+            NeonMagenta
         )
     )
 
     val Legendary = RarityShaderPalette(
-        primary = Color(0xFFFFD700), // Solar Amber Gold
-        secondary = Color(0xFFFF7700), // Molten Bronze
-        accent = Color(0xFFFFF4B8),
-        darkBase = Color(0xFF1F1200),
-        glowColor = Color(0x66FFD700),
-        borderColors = listOf(Color(0xFFFFD700), Color(0xFFFF8800), Color(0xFFFFEE55), Color(0xFFFFD700)),
+        primary = SolarGold,
+        secondary = AmberMolten,
+        accent = SolarCream,
+        darkBase = BronzeShadow,
+        glowColor = SolarGold.copy(alpha = 0.40f),
+        borderColors = listOf(SolarGold, AmberMolten, GoldLeaf, SolarGold),
         holographicColors = listOf(
-            Color(0xFFFFD700),
-            Color(0xFFFF5500),
-            Color(0xFFFFEE88),
-            Color(0xFFFF9900)
+            SolarGold,
+            AmberMolten,
+            SolarCream,
+            NeonAmber
         )
     )
 
     val Genesis = RarityShaderPalette(
-        primary = Color(0xFFFFFFFF), // Singularity White
-        secondary = Color(0xFF00F5FF),
-        accent = Color(0xFFFFD700),
-        darkBase = Color(0xFF0A0A14),
-        glowColor = Color(0x77FFFFFF),
+        primary = TextHigh,
+        secondary = NeonCyan,
+        accent = SolarGold,
+        darkBase = VoidSurface,
+        glowColor = TextHigh.copy(alpha = 0.45f),
         borderColors = listOf(
-            Color(0xFFFFFFFF),
-            Color(0xFF00F5FF),
-            Color(0xFFBD00FF),
-            Color(0xFFFFD700),
-            Color(0xFFFFFFFF)
+            TextHigh,
+            NeonCyan,
+            NeonPurple,
+            SolarGold,
+            TextHigh
         ),
         holographicColors = listOf(
-            Color(0xFFFFFFFF),
-            Color(0xFF00F5FF),
-            Color(0xFFBD00FF),
-            Color(0xFFFFD700),
-            Color(0xFF00FF66),
-            Color(0xFFFFFFFF)
+            TextHigh,
+            NeonCyan,
+            NeonPurple,
+            SolarGold,
+            EmeraldPure,
+            TextHigh
         )
     )
 
@@ -226,20 +228,22 @@ object AgslShaderSources {
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 private object AgslShaderCache {
     private val shaders = mutableMapOf<CyberRarityTier, android.graphics.RuntimeShader>()
+    private val failedTiers = mutableSetOf<CyberRarityTier>()
 
     fun getShader(tier: CyberRarityTier): android.graphics.RuntimeShader? {
-        return shaders.getOrPut(tier) {
-            try {
-                val source = when (tier) {
-                    CyberRarityTier.COMMON -> AgslShaderSources.COMMON_CRT_AGSL
-                    CyberRarityTier.RARE -> AgslShaderSources.RARE_CIRCUIT_AGSL
-                    CyberRarityTier.EPIC -> AgslShaderSources.EPIC_HOLO_AGSL
-                    CyberRarityTier.LEGENDARY, CyberRarityTier.GENESIS -> AgslShaderSources.LEGENDARY_VORTEX_AGSL
-                }
-                android.graphics.RuntimeShader(source)
-            } catch (e: Throwable) {
-                return null
+        shaders[tier]?.let { return it }
+        if (tier in failedTiers) return null
+        return try {
+            val source = when (tier) {
+                CyberRarityTier.COMMON -> AgslShaderSources.COMMON_CRT_AGSL
+                CyberRarityTier.RARE -> AgslShaderSources.RARE_CIRCUIT_AGSL
+                CyberRarityTier.EPIC -> AgslShaderSources.EPIC_HOLO_AGSL
+                CyberRarityTier.LEGENDARY, CyberRarityTier.GENESIS -> AgslShaderSources.LEGENDARY_VORTEX_AGSL
             }
+            android.graphics.RuntimeShader(source).also { shaders[tier] = it }
+        } catch (_: Throwable) {
+            failedTiers += tier
+            null
         }
     }
 }
@@ -259,11 +263,14 @@ fun CyberRarityShaderOverlay(
 ) {
     val tier = remember(rarity) { CyberRarityTier.fromString(rarity) }
     val palette = remember(tier) { CyberRarityPalettes.get(tier) }
+    val activeMotion = isAnimated && rememberMotionEnabled()
 
-    val infiniteTransition = rememberInfiniteTransition(label = "rarity_shader_transition")
-
-    val timeProgress by if (isAnimated) {
-        infiniteTransition.animateFloat(
+    val timeProgress: Float
+    val pulseGlow: Float
+    val foilOffset: Float
+    if (activeMotion) {
+        val infiniteTransition = rememberInfiniteTransition(label = "rarity_shader_transition")
+        timeProgress = infiniteTransition.animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
@@ -271,13 +278,8 @@ fun CyberRarityShaderOverlay(
                 repeatMode = RepeatMode.Restart
             ),
             label = "time_progress"
-        )
-    } else {
-        remember { mutableFloatStateOf(0.5f) }
-    }
-
-    val pulseGlow by if (isAnimated) {
-        infiniteTransition.animateFloat(
+        ).value
+        pulseGlow = infiniteTransition.animateFloat(
             initialValue = 0.75f,
             targetValue = 1.15f,
             animationSpec = infiniteRepeatable(
@@ -285,13 +287,8 @@ fun CyberRarityShaderOverlay(
                 repeatMode = RepeatMode.Reverse
             ),
             label = "pulse_glow"
-        )
-    } else {
-        remember { mutableFloatStateOf(1f) }
-    }
-
-    val foilOffset by if (isAnimated) {
-        infiniteTransition.animateFloat(
+        ).value
+        foilOffset = infiniteTransition.animateFloat(
             initialValue = -0.3f,
             targetValue = 1.3f,
             animationSpec = infiniteRepeatable(
@@ -299,9 +296,11 @@ fun CyberRarityShaderOverlay(
                 repeatMode = RepeatMode.Restart
             ),
             label = "foil_offset"
-        )
+        ).value
     } else {
-        remember { mutableFloatStateOf(0.5f) }
+        timeProgress = 0.35f
+        pulseGlow = 0.95f
+        foilOffset = 0.5f
     }
 
     // Canvas procedural shader renderer
@@ -463,10 +462,10 @@ private fun DrawScope.drawEpicHolographicShader(
     val holoBrush = Brush.linearGradient(
         colors = listOf(
             Color.Transparent,
-            Color(0xFFFF007F).copy(alpha = 0.12f * pulse),
-            Color(0xFFBD00FF).copy(alpha = 0.22f * pulse),
-            Color(0xFF00F5FF).copy(alpha = 0.28f * pulse),
-            Color(0xFFFFD700).copy(alpha = 0.18f * pulse),
+            NeonMagenta.copy(alpha = 0.12f * pulse),
+            NeonPurple.copy(alpha = 0.22f * pulse),
+            NeonCyan.copy(alpha = 0.28f * pulse),
+            SolarGold.copy(alpha = 0.18f * pulse),
             Color.Transparent
         ),
         start = Offset(sweepCenter - 120f, -40f),
@@ -477,13 +476,13 @@ private fun DrawScope.drawEpicHolographicShader(
     // 2. Chromatic Aberration Fringe Lines at top and bottom
     val shift = 2.5f * sin(progress * 6.28f)
     drawLine(
-        color = Color(0xFFFF0055).copy(alpha = 0.25f),
+        color = RoseLaser.copy(alpha = 0.25f),
         start = Offset(10f - shift, 12f),
         end = Offset(width - 10f - shift, 12f),
         strokeWidth = 1.5f
     )
     drawLine(
-        color = Color(0xFF00F5FF).copy(alpha = 0.25f),
+        color = NeonCyan.copy(alpha = 0.25f),
         start = Offset(10f + shift, 14f),
         end = Offset(width - 10f + shift, 14f),
         strokeWidth = 1.5f
@@ -614,7 +613,7 @@ private fun DrawScope.drawLegendaryVortexShader(
         val alpha = (sin(emberPhase * 3.14159f) * 0.65f * pulse).coerceIn(0f, 0.85f)
 
         drawCircle(
-            color = Color(0xFFFFF0A0).copy(alpha = alpha),
+            color = SolarCream.copy(alpha = alpha),
             radius = 2.5f,
             center = Offset(ex, ey)
         )
@@ -721,17 +720,22 @@ fun CyberRarityShaderCard(
 ) {
     val tier = remember(rarity) { CyberRarityTier.fromString(rarity) }
     val palette = remember(tier) { CyberRarityPalettes.get(tier) }
+    val motionEnabled = rememberMotionEnabled()
 
-    val infiniteTransition = rememberInfiniteTransition(label = "card_glow_pulse")
-    val borderPulse by infiniteTransition.animateFloat(
-        initialValue = 0.8f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "border_pulse"
-    )
+    val borderPulse = if (motionEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "card_glow_pulse")
+        infiniteTransition.animateFloat(
+            initialValue = 0.8f,
+            targetValue = 1.15f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "border_pulse"
+        ).value
+    } else {
+        1.0f
+    }
 
     // Animated dynamic border brush
     val borderBrush = remember(palette, borderPulse) {
@@ -748,7 +752,7 @@ fun CyberRarityShaderCard(
                     listOf(
                         palette.primary.copy(alpha = 0.20f * borderPulse),
                         palette.darkBase.copy(alpha = 0.95f),
-                        Color(0xFF04040A).copy(alpha = 0.98f)
+                        VoidNight.copy(alpha = 0.98f)
                     )
                 )
             )
@@ -761,7 +765,8 @@ fun CyberRarityShaderCard(
         // Dynamic visual shader effect layer
         CyberRarityShaderOverlay(
             rarity = rarity,
-            modifier = Modifier.matchParentSize()
+            modifier = Modifier.matchParentSize(),
+            isAnimated = motionEnabled
         )
 
         // Card Content on top
@@ -780,36 +785,40 @@ fun CyberRarityGlowBadge(
 ) {
     val tier = remember(rarity) { CyberRarityTier.fromString(rarity) }
     val palette = remember(tier) { CyberRarityPalettes.get(tier) }
+    val motionEnabled = rememberMotionEnabled()
 
-    val infiniteTransition = rememberInfiniteTransition(label = "badge_glow")
-    val alphaGlow by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 0.85f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "badge_alpha"
-    )
+    val alphaGlow = if (motionEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "badge_glow")
+        infiniteTransition.animateFloat(
+            initialValue = 0.4f,
+            targetValue = 0.85f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "badge_alpha"
+        ).value
+    } else {
+        0.75f
+    }
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(CyberShapes.chip)
             .background(palette.primary.copy(alpha = 0.18f))
             .border(
-                width = 1.2.dp,
+                width = 1.dp,
                 color = palette.primary.copy(alpha = alphaGlow),
-                shape = RoundedCornerShape(6.dp)
+                shape = CyberShapes.chip
             )
-            .padding(horizontal = 7.dp, vertical = 2.5.dp),
+            .padding(horizontal = 8.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center
     ) {
-        androidx.compose.material3.Text(
+        Text(
             text = text,
             color = palette.accent,
-            fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp),
-            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold
         )
     }
 }

@@ -8,4 +8,78 @@
     <string name="widget_default_subtitle">The Magician • Genesis</string>
     <string name="widget_default_advice">Oracle: Mastery of the four elements. Begin a new cultivation cycle.</string>
     <string name="widget_action_prompt">➔ OPEN IN HUB</string>
+
+    <string name="cd_cyber_radio">Cyber Radio Console</string>
+    <string name="cd_weed_credits">WEED Credits</string>
+    <string name="balance_weed_format">%1$d WEED</string>
+
+    <string name="tab_sub_divination">Botanical Oracle</string>
+    <string name="tab_sub_cards">Vault &amp; Battle Deck</string>
+    <string name="tab_sub_arena">Duel Arena</string>
+    <string name="tab_sub_crypto">Wallet, DEX &amp; NFT</string>
+    <string name="tab_sub_settings">Settings &amp; Security</string>
+
+    <string name="splash_validating_profile">Validating profile...</string>
+    <string name="splash_launching_setup">Launching profile setup...</string>
+    <string name="splash_subtitle">BOTANICAL ORACLE</string>
+    <string name="action_enter">Enter</string>
+    <string name="action_dismiss">Dismiss</string>
+    <string name="action_delete">Delete</string>
+
+    <string name="cards_tab_vault">Card Vault</string>
+    <string name="cards_tab_deck">Battle Deck</string>
+
+    <string name="divination_title">Consult the Oracle</string>
+    <string name="divination_subtitle">Botanical Arcana &amp; Guided Spreads</string>
+    <string name="divination_prompt_header">ORACLE QUESTION</string>
+    <string name="divination_prompt_placeholder">Describe your query, situation, or question for the oracle...</string>
+    <string name="divination_spread_header">SPREAD DEPTH</string>
+    <string name="spread_single_title">SINGLE (1)</string>
+    <string name="spread_single_sub">Quick insight</string>
+    <string name="spread_flow_title">FLOW (3)</string>
+    <string name="spread_flow_sub">Timeline weave</string>
+    <string name="spread_romantic_title">RELATIONS (5)</string>
+    <string name="spread_romantic_sub">Relational sync</string>
+    <string name="spread_celtic_title">CELTIC (10)</string>
+    <string name="spread_celtic_sub">Full cross</string>
+    <string name="spread_reward_1">Rewards +50 WEED • Quick insight</string>
+    <string name="spread_reward_3">Rewards +150 WEED • Timeline synthesis</string>
+    <string name="spread_reward_5">VIP channel • +250 WEED relational map</string>
+    <string name="spread_reward_10">Master Oracle • +500 WEED full cross</string>
+
+    <string name="oracle_blessings_title">ORACLE BLESSINGS &amp; QUESTS</string>
+    <string name="oracle_blessings_sub">Claim quest rewards, boost yield, and unlock VIP channels.</string>
+
+    <string name="vip_dialog_title">VIP CHANNEL ACCESS</string>
+    <string name="vip_dialog_body">This premium layout (%1$d cards) requires %2$d WEED credits for a single scan, or open the Blessings Portal for permanent access.</string>
+    <string name="vip_spend_format">Spend %1$d</string>
+    <string name="vip_lease_acquired">Single-scan access unlocked. Processing...</string>
+    <string name="vip_insufficient_credits">Insufficient WEED credits.</string>
+    <string name="vip_portal_button">Blessing Portal</string>
+
+    <string name="divination_initialize_scan">Initialize Scan</string>
+    <string name="divination_history_title">DIVINATION HISTORY</string>
+    <string name="divination_no_question">No question</string>
+    <string name="divination_scanning_title">SYNCHRONIZING ORACLE CHANNEL...</string>
+    <string name="divination_scan_log_1">Initializing oracle core...</string>
+    <string name="divination_scan_log_2">Querying botanical archive...</string>
+    <string name="divination_scan_log_3">Opening encrypted channel...</string>
+    <string name="divination_scan_log_4">Decoding card vectors...</string>
+    <string name="divination_scan_log_5">Synthesizing interpretation...</string>
+    <string name="divination_complete">READING COMPLETE</string>
+    <string name="divination_new_scan">New Scan</string>
+    <string name="divination_question_format">Question: "%1$s"</string>
+    <string name="divination_report_header">ORACLE INTERPRETATION</string>
+    <string name="divination_stop_voice">Stop Voice</string>
+    <string name="divination_speak_voice">Speak Interpretation</string>
+
+    <string name="card_tap_to_reveal">TAP TO REVEAL</string>
+    <string name="card_mint_nft">MINT NFT (200 N$)</string>
+    <string name="card_minted">MINTED SECURELY</string>
+    <string name="cd_open">Open</string>
+    <string name="cd_history">History</string>
+    <string name="cd_toggle">Toggle details</string>
+    <string name="cd_scanning">Scanning</string>
+    <string name="cd_reset">Reset</string>
+    <string name="cd_mint_format">Mint %1$s</string>
 </resources>

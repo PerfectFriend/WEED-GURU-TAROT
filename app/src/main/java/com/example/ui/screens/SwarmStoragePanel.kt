@@ -4,34 +4,62 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.UserProfile
-import com.example.ui.theme.CyberCharcoal
-import com.example.ui.theme.CyberObsidian
+import com.example.ui.components.CyberActionButton
+import com.example.ui.components.CyberChip
+import com.example.ui.components.CyberPanel
+import com.example.ui.components.CyberSectionHeader
+import com.example.ui.theme.Cyber
+import com.example.ui.theme.CyberShapes
+import com.example.ui.theme.IbmPlexMonoFontFamily
+import com.example.ui.theme.NeonAmber
 import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.NeonGreen
-import com.example.ui.theme.RajdhaniFontFamily
+import com.example.ui.theme.Space
 import com.example.viewmodel.TarotViewModel
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwarmStoragePanel(viewModel: TarotViewModel) {
+    val c = Cyber.colors
     val currentSkin by viewModel.currentSkin.collectAsStateWithLifecycle()
     val allocatedSize by viewModel.swarmContainerAllocatedSize.collectAsStateWithLifecycle()
     val isMounted by viewModel.swarmContainerMounted.collectAsStateWithLifecycle()
@@ -54,175 +82,712 @@ fun SwarmStoragePanel(viewModel: TarotViewModel) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 32.dp)
+        verticalArrangement = Arrangement.spacedBy(Space.lg),
+        contentPadding = PaddingValues(bottom = Space.xxl)
     ) {
-        // 1. PHYSICAL STORAGE ALLOCATION CONSOLE
         item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CyberCharcoal),
-                border = BorderStroke(1.dp, currentSkin.primaryColor.copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(8.dp),
+            CyberPanel(
+                borderColor = currentSkin.primaryColor.copy(alpha = 0.4f),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                CyberSectionHeader(
+                    title = "SECURE SPACE PROVISIONING & PHYSICAL ALLOCATION",
+                    subtitle = "Allocates a physical encrypted storage volume on your local device storage.",
+                    color = currentSkin.primaryColor
+                )
+                Spacer(modifier = Modifier.height(Space.md))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(c.ink, CyberShapes.chip)
+                        .border(1.dp, c.goldAntique.copy(alpha = 0.3f), CyberShapes.chip)
+                        .padding(Space.md),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "SECURE SPACE PROVISIONING & PHYSICAL ALLOCATION",
-                        fontFamily = RajdhaniFontFamily,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = currentSkin.primaryColor
+                        text = "STATUS:",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = c.textMid
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "This allocates a physical encrypted storage volume (container file) using instant space reservation. The file resides on your local device storage, operating on a torrent-like scheme for maximum autonomy and peer resilience.",
-                        fontSize = 16.sp,
-                        fontFamily = RajdhaniFontFamily,
-                        color = Color.LightGray,
-                        lineHeight = 15.sp
+                        text = if (allocatedSize > 0) {
+                            "${String.format(Locale.US, "%.2f", allocatedSize / (1024 * 1024 * 1024.0))} GB RESERVED"
+                        } else {
+                            "NO ACTIVE ALLOCATION"
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        fontFamily = IbmPlexMonoFontFamily,
+                        color = if (allocatedSize > 0) c.emeraldGlow else c.danger
                     )
-                    Spacer(modifier = Modifier.height(14.dp))
+                }
+
+                if (allocatedSize == 0L) {
+                    Spacer(modifier = Modifier.height(Space.md))
+
+                    Text(
+                        text = "CONTAINER MASTER PASSPHRASE (PBKDF2-HMAC-SHA256, 210,000 iterations)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = c.textMid
+                    )
+                    Spacer(modifier = Modifier.height(Space.xs))
+                    OutlinedTextField(
+                        value = passphraseInput,
+                        onValueChange = { passphraseInput = it },
+                        placeholder = { Text("Enter strong node security key") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textHigh),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(Space.md))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "PROVISIONED CAPACITY:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = c.textMid
+                        )
+                        Text(
+                            text = "${sizeSelectionGb.toInt()} GB",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontFamily = IbmPlexMonoFontFamily,
+                            color = currentSkin.primaryColor
+                        )
+                    }
+                    Slider(
+                        value = sizeSelectionGb,
+                        onValueChange = { sizeSelectionGb = it },
+                        valueRange = 1f..32f,
+                        steps = 31,
+                        colors = SliderDefaults.colors(
+                            thumbColor = currentSkin.primaryColor,
+                            activeTrackColor = currentSkin.primaryColor,
+                            inactiveTrackColor = c.panelRaised
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(Space.md))
+
+                    if (isAllocating) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            LinearProgressIndicator(
+                                progress = { allocationProgress },
+                                color = currentSkin.primaryColor,
+                                trackColor = c.panelRaised,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(Space.xs))
+                            Text(
+                                text = "Reserving Disk Blocks... ${String.format(Locale.US, "%.0f", allocationProgress * 100)}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = c.textMid,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    } else {
+                        CyberActionButton(
+                            text = "PRE-ALLOCATE & ENCRYPT CRYPTO-VOLUME",
+                            onClick = {
+                                if (passphraseInput.isNotBlank()) {
+                                    val bytes = sizeSelectionGb.toLong() * 1024 * 1024 * 1024L
+                                    viewModel.allocateSwarmContainer(bytes, passphraseInput)
+                                } else {
+                                    viewModel.postNotification("Please enter a secure passphrase before generating container.")
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(Space.md))
+                    CyberTextButton(
+                        onClick = { viewModel.deallocateSwarmContainer() },
+                        text = "PURGE & SECURE-ERASE CONTAINER FROM DISK",
+                        skin = currentSkin,
+                        containerColor = c.danger,
+                        contentColor = c.textHigh,
+                        shape = CyberShapes.control,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        if (allocatedSize > 0) {
+            item {
+                CyberPanel(
+                    borderColor = if (isMounted) c.emeraldGlow.copy(alpha = 0.45f) else c.goldAntique.copy(alpha = 0.35f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    CyberSectionHeader(
+                        title = "SECURE VOLUME DECRYPTION & MOUNT ENGINE",
+                        color = if (isMounted) c.emeraldGlow else c.textHigh
+                    )
+                    Spacer(modifier = Modifier.height(Space.md))
 
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.Black, RoundedCornerShape(4.dp))
-                            .border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp))
-                            .padding(12.dp),
+                            .background(c.ink, CyberShapes.chip)
+                            .border(1.dp, c.goldAntique.copy(alpha = 0.3f), CyberShapes.chip)
+                            .padding(Space.md),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(if (isMounted) c.emeraldGlow else c.danger, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(Space.sm))
+                            Text(
+                                text = "MOUNT STATUS:",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = c.textMid
+                            )
+                        }
                         Text(
-                            text = "STATUS:",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 16.sp,
-                            color = Color(0xFFB0B0C5)
-                        )
-                        Text(
-                            text = if (allocatedSize > 0) {
-                                "${String.format("%.2f", allocatedSize / (1024 * 1024 * 1024.0))} GB RESERVED"
-                            } else {
-                                "NO ACTIVE ALLOCATION"
-                            },
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (allocatedSize > 0) NeonGreen else Color.Red
+                            text = if (isMounted) "RAM MOUNTED (UNLOCKED)" else "LOCKED (ENCRYPTED)",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontFamily = IbmPlexMonoFontFamily,
+                            color = if (isMounted) c.emeraldGlow else c.danger
                         )
                     }
 
-                    if (allocatedSize == 0L) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(Space.md))
 
+                    if (!isMounted) {
                         Text(
-                            text = "CONTAINER MASTER PASSPHRASE (derived via PBKDF2-HMAC-SHA256, 210,000 iterations)",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 15.sp,
-                            color = Color(0xFFB0B0C5)
+                            text = "ENTER MASTER PASSPHRASE TO MOUNT VOLUME:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = c.textMid
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(Space.xs))
                         OutlinedTextField(
                             value = passphraseInput,
                             onValueChange = { passphraseInput = it },
-                            placeholder = { Text("Enter strong node security key", fontSize = 16.sp, color = Color.DarkGray) },
+                            placeholder = { Text("Verify passphrase") },
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),
-                            textStyle = TextStyle(fontFamily = RajdhaniFontFamily, fontSize = 16.sp, color = Color.White),
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textHigh),
                             modifier = Modifier.fillMaxWidth()
                         )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "PROVISIONED CAPACITY:",
-                                fontFamily = RajdhaniFontFamily,
-                                fontSize = 15.sp,
-                                color = Color(0xFFB0B0C5)
-                            )
-                            Text(
-                                text = "${sizeSelectionGb.toInt()} GB",
-                                fontFamily = RajdhaniFontFamily,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = currentSkin.primaryColor
-                            )
-                        }
-                        Slider(
-                            value = sizeSelectionGb,
-                            onValueChange = { sizeSelectionGb = it },
-                            valueRange = 1f..32f,
-                            steps = 31,
-                            colors = SliderDefaults.colors(
-                                thumbColor = currentSkin.primaryColor,
-                                activeTrackColor = currentSkin.primaryColor,
-                                inactiveTrackColor = Color.DarkGray
-                            ),
+                        Spacer(modifier = Modifier.height(Space.md))
+                        CyberActionButton(
+                            text = "UNLOCK & MOUNT PARTITION",
+                            onClick = {
+                                if (passphraseInput.isNotBlank()) {
+                                    viewModel.mountSwarmContainer(passphraseInput)
+                                    passphraseInput = ""
+                                } else {
+                                    viewModel.postNotification("Passphrase is required to unlock container.")
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth()
                         )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        if (isAllocating) {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                LinearProgressIndicator(
-                                    progress = { allocationProgress },
-                                    color = currentSkin.primaryColor,
-                                    trackColor = Color.DarkGray,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Reserving Disk Blocks... ${String.format("%.0f", allocationProgress * 100)}%",
-                                    fontSize = 16.sp,
-                                    fontFamily = RajdhaniFontFamily,
-                                    color = Color.LightGray,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        } else {
-                            CyberButton(
-                                onClick = {
-                                    if (passphraseInput.isNotBlank()) {
-                                        val bytes = sizeSelectionGb.toLong() * 1024 * 1024 * 1024L
-                                        viewModel.allocateSwarmContainer(bytes, passphraseInput)
-                                    } else {
-                                        viewModel.postNotification("⚠️ Please enter a secure passphrase before generating container.")
-                                    }
-                                },
-                                skin = currentSkin,
-                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                AutoResizingText(
-                                    text = "PRE-ALLOCATE & ENCRYPT CRYPTO-VOLUME",
-                                    targetTextSize = 11.sp,
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
                     } else {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        CyberButton(
-                            onClick = { viewModel.deallocateSwarmContainer() },
-                            skin = currentSkin,
-                            containerColor = Color.Red,
-                            contentColor = Color.White,
-                            modifier = Modifier.fillMaxWidth().height(44.dp),
-                            shape = RoundedCornerShape(12.dp)
+                        CyberActionButton(
+                            text = "UNMOUNT & PURGE VOLATILE KEYS FROM RAM",
+                            onClick = { viewModel.unmountSwarmContainer() },
+                            secondary = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+        }
+
+        if (isMounted) {
+            item {
+                CyberPanel(
+                    borderColor = currentSkin.secondaryColor.copy(alpha = 0.45f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    CyberSectionHeader(
+                        title = "SECURE BLOCK SHARD TESTING MATRIX",
+                        color = currentSkin.primaryColor
+                    )
+                    Spacer(modifier = Modifier.height(Space.md))
+
+                    Text(
+                        text = "SELECT VIRTUAL SHARD INDEX:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = c.textMid
+                    )
+                    Spacer(modifier = Modifier.height(Space.xs))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Space.xs)
+                    ) {
+                        (0..4).forEach { idx ->
+                            CyberChip(
+                                label = "#$idx",
+                                selected = selectedShardIndex == idx,
+                                onClick = { selectedShardIndex = idx },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(Space.md))
+
+                    Text(
+                        text = "SHARD DATA CARGO:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = c.textMid
+                    )
+                    Spacer(modifier = Modifier.height(Space.xs))
+                    OutlinedTextField(
+                        value = shardPayloadInput,
+                        onValueChange = { shardPayloadInput = it },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textHigh),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(Space.md))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Space.sm)
+                    ) {
+                        CyberActionButton(
+                            text = "WRITE SHARD",
+                            onClick = { viewModel.writeSwarmShardBlock(selectedShardIndex, shardPayloadInput) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        CyberActionButton(
+                            text = "READ SHARD",
+                            onClick = {
+                                viewModel.readSwarmShardBlock(selectedShardIndex) { result ->
+                                    decryptedShardOutput = result ?: "EMPTY BLOCK"
+                                }
+                            },
+                            secondary = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    decryptedShardOutput?.let { output ->
+                        Spacer(modifier = Modifier.height(Space.md))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(c.ink, CyberShapes.chip)
+                                .border(1.dp, c.goldAntique.copy(alpha = 0.3f), CyberShapes.chip)
+                                .padding(Space.md)
                         ) {
-                            AutoResizingText(
-                                text = "PURGE & SECURE-ERASE CONTAINER FROM DISK",
-                                targetTextSize = 11.sp,
-                                fontFamily = RajdhaniFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
+                            Column {
+                                Text(
+                                    text = "DECRYPTED SHARD #$selectedShardIndex:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = c.textMid
+                                )
+                                Spacer(modifier = Modifier.height(Space.xs))
+                                Text(
+                                    text = output,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontFamily = IbmPlexMonoFontFamily,
+                                    color = c.emeraldGlow
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            val userP = profile ?: UserProfile()
+            CyberPanel(
+                borderColor = currentSkin.primaryColor.copy(alpha = 0.45f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                CyberSectionHeader(
+                    title = "SUB-ZERO NODE STAKING & UPTIME INSURANCE",
+                    subtitle = "Lock WEED tokens in node escrow to unlock advanced server roles and priority ranking.",
+                    color = currentSkin.primaryColor
+                )
+                Spacer(modifier = Modifier.height(Space.md))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Space.sm)
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = c.ink),
+                        border = BorderStroke(1.dp, c.goldAntique.copy(alpha = 0.3f)),
+                        shape = CyberShapes.chip,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(modifier = Modifier.padding(Space.md), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("WALLET BALANCE", style = MaterialTheme.typography.labelMedium, color = c.textMid)
+                            Spacer(modifier = Modifier.height(Space.xs))
+                            Text("${userP.weed} WEED", style = MaterialTheme.typography.titleSmall, fontFamily = IbmPlexMonoFontFamily, color = c.textHigh)
+                        }
+                    }
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = c.ink),
+                        border = BorderStroke(1.dp, currentSkin.primaryColor.copy(alpha = 0.5f)),
+                        shape = CyberShapes.chip,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(modifier = Modifier.padding(Space.md), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("STAKED NODE ESCROW", style = MaterialTheme.typography.labelMedium, color = currentSkin.primaryColor)
+                            Spacer(modifier = Modifier.height(Space.xs))
+                            Text("${userP.nodeStake} WEED", style = MaterialTheme.typography.titleSmall, fontFamily = IbmPlexMonoFontFamily, color = c.emeraldGlow)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(Space.md))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(c.ink, CyberShapes.chip)
+                        .border(1.dp, c.goldAntique.copy(alpha = 0.25f), CyberShapes.chip)
+                        .padding(Space.md)
+                ) {
+                    Text(
+                        text = "PRIVILEGE ESCROW LEVELS:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = c.textMid
+                    )
+                    Spacer(modifier = Modifier.height(Space.xs))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("STORAGE: 100 WEED", style = MaterialTheme.typography.labelMedium, color = if (userP.nodeStake >= 100) c.emeraldGlow else c.textMid)
+                        Text("RELAY: 250 WEED", style = MaterialTheme.typography.labelMedium, color = if (userP.nodeStake >= 250) c.emeraldGlow else c.textMid)
+                    }
+                    Spacer(modifier = Modifier.height(Space.xs))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("VALIDATOR: 500 WEED", style = MaterialTheme.typography.labelMedium, color = if (userP.nodeStake >= 500) c.emeraldGlow else c.textMid)
+                        Text("ORACLE: 1000 WEED", style = MaterialTheme.typography.labelMedium, color = if (userP.nodeStake >= 1000) c.emeraldGlow else c.textMid)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(Space.md))
+
+                var stakeInputText by remember { mutableStateOf("100") }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Space.sm)
+                ) {
+                    OutlinedTextField(
+                        value = stakeInputText,
+                        onValueChange = { stakeInputText = it },
+                        label = { Text("Weed Amount") },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textHigh),
+                        modifier = Modifier.weight(1f)
+                    )
+                    CyberActionButton(
+                        text = "STAKE",
+                        onClick = {
+                            val amt = stakeInputText.toIntOrNull() ?: 0
+                            if (amt > 0) viewModel.stakeSwarmWeed(amt)
+                        }
+                    )
+                    CyberActionButton(
+                        text = "UNSTAKE",
+                        onClick = {
+                            val amt = stakeInputText.toIntOrNull() ?: 0
+                            if (amt > 0) viewModel.unstakeSwarmWeed(amt)
+                        },
+                        secondary = true
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(Space.md))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(c.ink, CyberShapes.chip)
+                        .border(1.dp, c.goldAntique.copy(alpha = 0.25f), CyberShapes.chip)
+                        .padding(Space.md),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("NODE LIVE UPTIME", style = MaterialTheme.typography.labelMedium, color = c.textMid)
+                        Spacer(modifier = Modifier.height(Space.xxs))
+                        Text("${userP.nodeUptimeMinutes} mins", style = MaterialTheme.typography.titleSmall, fontFamily = IbmPlexMonoFontFamily, color = c.emeraldGlow)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("OFFLINE PENALTY ENGINE", style = MaterialTheme.typography.labelMedium, color = c.danger)
+                        Spacer(modifier = Modifier.height(Space.xxs))
+                        Text("50% Slashed if Offline >15m", style = MaterialTheme.typography.bodySmall, color = c.textMid)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(Space.md))
+
+                CyberTextButton(
+                    onClick = { viewModel.simulateFifteenMinutesOffline() },
+                    text = "SIMULATE 15-MINUTE OUTAGE (PENALTY SLASH TEST)",
+                    skin = currentSkin,
+                    containerColor = c.danger.copy(alpha = 0.16f),
+                    contentColor = c.danger,
+                    shape = CyberShapes.control,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        item {
+            val userP = profile ?: UserProfile()
+            CyberPanel(
+                borderColor = if (userP.nodeBandwidthMbps >= 3.0) NeonCyan.copy(alpha = 0.45f) else c.danger.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                CyberSectionHeader(
+                    title = "DECENTRALIZED TRANSIT CHANNEL BANDWIDTH",
+                    subtitle = "Minimum 3.0 Mbps required to assist global routing maps.",
+                    color = if (userP.nodeBandwidthMbps >= 3.0) NeonCyan else c.danger
+                )
+                Spacer(modifier = Modifier.height(Space.md))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(c.ink, CyberShapes.chip)
+                        .border(1.dp, c.goldAntique.copy(alpha = 0.25f), CyberShapes.chip)
+                        .padding(Space.md),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("MEASURED TRANSIT SPEED", style = MaterialTheme.typography.labelMedium, color = c.textMid)
+                        Spacer(modifier = Modifier.height(Space.xxs))
+                        Text(
+                            text = "${String.format(Locale.US, "%.2f", userP.nodeBandwidthMbps)} Mbps",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontFamily = IbmPlexMonoFontFamily,
+                            color = if (userP.nodeBandwidthMbps >= 3.0) c.emeraldGlow else c.danger
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("ROUTING PROTOCOL STATE", style = MaterialTheme.typography.labelMedium, color = c.textMid)
+                        Spacer(modifier = Modifier.height(Space.xxs))
+                        Text(
+                            text = if (userP.nodeBandwidthMbps >= 3.0) "ELIGIBLE" else "LOCAL ONLY",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (userP.nodeBandwidthMbps >= 3.0) c.emeraldGlow else NeonAmber
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(Space.md))
+
+                if (isSpeedTesting) {
+                    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = NeonCyan, modifier = Modifier.size(28.dp))
+                        Spacer(modifier = Modifier.height(Space.sm))
+                        Text("Testing network transit speed... Please stand by.", style = MaterialTheme.typography.bodySmall, color = c.textMid)
+                    }
+                } else {
+                    CyberActionButton(
+                        text = "RUN CHANNEL BANDWIDTH SPEED TEST",
+                        onClick = { viewModel.runBandwidthSpeedTest() },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        item {
+            CyberPanel(
+                borderColor = if (nodeActive) NeonCyan.copy(alpha = 0.45f) else c.goldAntique.copy(alpha = 0.35f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "DECENTRAL SWARM P2P NETWORK COORDINATOR",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (nodeActive) NeonCyan else c.textHigh,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(if (nodeActive) NeonCyan else c.danger, CircleShape)
+                    )
+                }
+                Spacer(modifier = Modifier.height(Space.xs))
+                Text(
+                    text = "Configures local discovery, routing, and transit protocols via UDP local socket broadcasts.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMid
+                )
+                Spacer(modifier = Modifier.height(Space.md))
+
+                Text(
+                    text = "SELECT SWARM OPERATIONAL MODE / ROLE LEVEL:",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = c.textMid
+                )
+                Spacer(modifier = Modifier.height(Space.xs))
+
+                val roles = listOf("Storage", "Relay", "Validator", "Oracle")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Space.xs)
+                ) {
+                    roles.forEach { r ->
+                        CyberChip(
+                            label = r.uppercase(),
+                            selected = nodeRole == r,
+                            onClick = { viewModel.setSwarmNodeRole(r) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(Space.md))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(c.ink, CyberShapes.chip)
+                        .border(1.dp, c.goldAntique.copy(alpha = 0.25f), CyberShapes.chip)
+                        .padding(Space.md),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "SWARM NODE PROTOCOL:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = c.textMid
+                        )
+                        Spacer(modifier = Modifier.height(Space.xxs))
+                        Text(
+                            text = if (nodeActive) "UDP BROADCASTER ONLINE" else "OFFLINE",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = if (nodeActive) NeonCyan else c.danger
+                        )
+                    }
+                    Switch(
+                        checked = nodeActive,
+                        onCheckedChange = { active ->
+                            if (active) viewModel.startSwarmNode() else viewModel.stopSwarmNode()
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = NeonCyan,
+                            checkedTrackColor = NeonCyan.copy(alpha = 0.3f),
+                            uncheckedThumbColor = c.textMid,
+                            uncheckedTrackColor = c.ink
+                        )
+                    )
+                }
+
+                if (nodeActive) {
+                    Spacer(modifier = Modifier.height(Space.md))
+                    Text(
+                        text = "DISCOVERED SWARM NEIGHBORS (PEERS ON SUBNET):",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = c.textMid
+                    )
+                    Spacer(modifier = Modifier.height(Space.xs))
+
+                    if (peers.isEmpty()) {
+                        Text(
+                            text = "Scanning local subnet... UDP Port 9944 broadcast active.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMid,
+                            modifier = Modifier.padding(vertical = Space.xs)
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                            peers.forEach { peer ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(c.panelRaised, CyberShapes.chip)
+                                        .border(1.dp, c.goldAntique.copy(alpha = 0.25f), CyberShapes.chip)
+                                        .padding(Space.md),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "${peer.id} (${peer.ip})",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontFamily = IbmPlexMonoFontFamily,
+                                            color = c.textHigh
+                                        )
+                                        Spacer(modifier = Modifier.height(Space.xxs))
+                                        Text(
+                                            text = "Role: ${peer.role} | Cap: ${peer.allocatedGb} GB",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = c.textMid
+                                        )
+                                        Spacer(modifier = Modifier.height(Space.sm))
+                                        CyberActionButton(
+                                            text = "STREAM SHARD #$selectedShardIndex",
+                                            onClick = {
+                                                viewModel.fetchSwarmShardBlockFromPeer(peer.ip, selectedShardIndex) { result ->
+                                                    decryptedShardOutput = result ?: "EMPTY CHUNK"
+                                                }
+                                            }
+                                        )
+                                    }
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = c.ink),
+                                        border = BorderStroke(1.dp, c.emeraldGlow.copy(alpha = 0.3f)),
+                                        shape = CyberShapes.chip
+                                    ) {
+                                        Text(
+                                            text = peer.status,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = c.emeraldGlow,
+                                            modifier = Modifier.padding(horizontal = Space.sm, vertical = Space.xs)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(Space.md))
+                Text(
+                    text = "NODE REAL-TIME SIGNAL STREAM:",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = c.textMid
+                )
+                Spacer(modifier = Modifier.height(Space.xs))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp)
+                        .background(c.ink, CyberShapes.chip)
+                        .border(1.dp, c.goldAntique.copy(alpha = 0.25f), CyberShapes.chip)
+                        .padding(Space.md)
+                ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(Space.xs)
+                    ) {
+                        items(logs) { log ->
+                            Text(
+                                text = log,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (log.contains("Critical") || log.contains("Error")) c.danger else if (log.contains("SWARM")) NeonCyan else c.textMid
                             )
                         }
                     }
@@ -230,835 +795,75 @@ fun SwarmStoragePanel(viewModel: TarotViewModel) {
             }
         }
 
-        // 2. CRYPTOGRAPHIC MOUNT & DECRYPTION VAULT
-        if (allocatedSize > 0) {
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = CyberCharcoal),
-                    border = BorderStroke(1.dp, if (isMounted) NeonGreen.copy(alpha = 0.4f) else Color.DarkGray),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "SECURE VOLUME DECRYPTION & MOUNT ENGINE",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isMounted) NeonGreen else Color.White
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+        item {
+            CyberPanel(
+                borderColor = c.goldAntique.copy(alpha = 0.35f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                CyberSectionHeader(
+                    title = "GLOBAL DECENTRALIZED CLUSTER RANKINGS",
+                    subtitle = "Rank index determined by locked WEED escrow stake, uptime, and bandwidth.",
+                    color = c.textHigh
+                )
+                Spacer(modifier = Modifier.height(Space.md))
 
+                Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                    leaderboard.forEachIndexed { idx, rankNode ->
+                        val isUser = rankNode.isUser
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color.Black, RoundedCornerShape(4.dp))
-                                .border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp))
-                                .padding(12.dp),
+                                .background(
+                                    if (isUser) NeonCyan.copy(alpha = 0.08f) else c.panelRaised,
+                                    CyberShapes.chip
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isUser) NeonCyan else c.goldAntique.copy(alpha = 0.25f),
+                                    CyberShapes.chip
+                                )
+                                .padding(Space.md),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(if (isMounted) NeonGreen else Color.Red, CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Text(
-                                    text = "MOUNT STATUS:",
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontSize = 16.sp,
-                                    color = Color(0xFFB0B0C5)
+                                    text = "#${idx + 1}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontFamily = IbmPlexMonoFontFamily,
+                                    color = if (isUser) NeonCyan else c.textMid,
+                                    modifier = Modifier.width(34.dp)
                                 )
-                            }
-                            Text(
-                                text = if (isMounted) "RAM MOUNTED (UNLOCKED)" else "LOCKED (ENCRYPTED)",
-                                fontFamily = RajdhaniFontFamily,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isMounted) NeonGreen else Color.Red
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        if (!isMounted) {
-                            Text(
-                                text = "ENTER MASTER PASSPHRASE TO MOUNT VOLUME:",
-                                fontFamily = RajdhaniFontFamily,
-                                fontSize = 15.sp,
-                                color = Color(0xFFB0B0C5)
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            OutlinedTextField(
-                                value = passphraseInput,
-                                onValueChange = { passphraseInput = it },
-                                placeholder = { Text("Verify passphrase", fontSize = 16.sp, color = Color.DarkGray) },
-                                singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(),
-                                textStyle = TextStyle(fontFamily = RajdhaniFontFamily, fontSize = 16.sp, color = Color.White),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            CyberButton(
-                                onClick = {
-                                    if (passphraseInput.isNotBlank()) {
-                                        viewModel.mountSwarmContainer(passphraseInput)
-                                        passphraseInput = ""
-                                    } else {
-                                        viewModel.postNotification("⚠️ Passphrase is required to unlock container.")
-                                    }
-                                },
-                                skin = currentSkin,
-                                containerColor = NeonGreen,
-                                contentColor = CyberObsidian,
-                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                AutoResizingText(
-                                    text = "UNLOCK & MOUNT PARTITION",
-                                    targetTextSize = 11.sp,
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        } else {
-                            CyberButton(
-                                onClick = { viewModel.unmountSwarmContainer() },
-                                skin = currentSkin,
-                                containerColor = Color.DarkGray,
-                                contentColor = Color.White,
-                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                AutoResizingText(
-                                    text = "UNMOUNT & PURGE VOLATILE KEYS FROM RAM",
-                                    targetTextSize = 11.sp,
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 3. SECURE BLOCK SHARD WRITER & AUDITOR
-        if (isMounted) {
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = CyberCharcoal),
-                    border = BorderStroke(1.dp, currentSkin.secondaryColor.copy(alpha = 0.4f)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "SECURE BLOCK SHARD TESTING MATRIX",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = currentSkin.primaryColor
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "SELECT VIRTUAL SHARD INDEX:",
-                                fontFamily = RajdhaniFontFamily,
-                                fontSize = 15.sp,
-                                color = Color(0xFFB0B0C5)
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                (0..4).forEach { idx ->
-                                    val isSel = selectedShardIndex == idx
-                                    Box(
-                                        modifier = Modifier
-                                            .background(
-                                                if (isSel) currentSkin.secondaryColor.copy(alpha = 0.2f) else Color.Transparent,
-                                                RoundedCornerShape(4.dp)
-                                            )
-                                            .border(1.dp, if (isSel) currentSkin.primaryColor else Color.DarkGray, RoundedCornerShape(4.dp))
-                                            .clickable { selectedShardIndex = idx }
-                                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(
-                                            text = "#$idx",
-                                            fontSize = 16.sp,
-                                            fontFamily = RajdhaniFontFamily,
-                                            color = if (isSel) currentSkin.primaryColor else Color(0xFFB0B0C5)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Text(
-                            text = "SHARD DATA CARGO:",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 15.sp,
-                            color = Color(0xFFB0B0C5)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = shardPayloadInput,
-                            onValueChange = { shardPayloadInput = it },
-                            textStyle = TextStyle(fontFamily = RajdhaniFontFamily, fontSize = 16.sp, color = Color.White),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            CyberButton(
-                                onClick = { viewModel.writeSwarmShardBlock(selectedShardIndex, shardPayloadInput) },
-                                skin = currentSkin,
-                                containerColor = currentSkin.secondaryColor,
-                                contentColor = CyberObsidian,
-                                modifier = Modifier.weight(1f).height(46.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                AutoResizingText(
-                                    text = "WRITE SHARD",
-                                    targetTextSize = 11.sp,
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                            CyberButton(
-                                onClick = {
-                                    viewModel.readSwarmShardBlock(selectedShardIndex) { result ->
-                                        decryptedShardOutput = result ?: "EMPTY BLOCK"
-                                    }
-                                },
-                                skin = currentSkin,
-                                containerColor = Color.Black,
-                                contentColor = Color.White,
-                                modifier = Modifier.weight(1f).height(46.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                AutoResizingText(
-                                    text = "READ SHARD",
-                                    targetTextSize = 11.sp,
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-
-                        decryptedShardOutput?.let { output ->
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color.Black, RoundedCornerShape(4.dp))
-                                    .border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp))
-                                    .padding(10.dp)
-                            ) {
                                 Column {
                                     Text(
-                                        text = "DECRYPTED SHARD #$selectedShardIndex:",
-                                        fontSize = 15.sp,
-                                        fontFamily = RajdhaniFontFamily,
-                                        color = Color(0xFFB0B0C5)
+                                        text = rankNode.name,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = if (isUser) NeonCyan else c.textHigh
                                     )
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Spacer(modifier = Modifier.height(Space.xxs))
                                     Text(
-                                        text = output,
-                                        fontSize = 16.sp,
-                                        fontFamily = RajdhaniFontFamily,
-                                        color = NeonGreen
+                                        text = "Role: ${rankNode.role} | Bandwidth: ${String.format(Locale.US, "%.1f", rankNode.speedMbps)} Mbps",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = c.textMid
                                     )
                                 }
                             }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 3a. SUB-ZERO NODE STAKING & UPTIME MONITOR
-        item {
-            val userP = profile ?: UserProfile()
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CyberCharcoal),
-                border = BorderStroke(1.dp, currentSkin.primaryColor.copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "SUB-ZERO NODE STAKING & UPTIME INSURANCE",
-                        fontFamily = RajdhaniFontFamily,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = currentSkin.primaryColor
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Operating a node is a critical network privilege. It requires locking (freezing) WEED tokens in a dedicated node escrow. Higher stake levels unlock advanced server roles and boost your global network priority ranking.",
-                        fontSize = 16.sp,
-                        fontFamily = RajdhaniFontFamily,
-                        color = Color.LightGray,
-                        lineHeight = 15.sp
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color.Black),
-                            border = BorderStroke(1.dp, Color.DarkGray),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("WALLET BALANCE", fontSize = 15.sp, fontFamily = RajdhaniFontFamily, color = Color(0xFFB0B0C5))
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("${userP.weed} WEED", fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = RajdhaniFontFamily, color = Color.White)
-                            }
-                        }
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color.Black),
-                            border = BorderStroke(1.dp, currentSkin.primaryColor.copy(alpha = 0.5f)),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("STAKED NODE ESCROW", fontSize = 15.sp, fontFamily = RajdhaniFontFamily, color = currentSkin.primaryColor)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("${userP.nodeStake} WEED", fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = RajdhaniFontFamily, color = NeonGreen)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFF07070F), RoundedCornerShape(4.dp))
-                            .border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp))
-                            .padding(10.dp)
-                    ) {
-                        Text(
-                            text = "PRIVILEGE ESCROW LEVELS:",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = RajdhaniFontFamily,
-                            color = Color(0xFFB0B0C5)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("STORAGE: 100 WEED", fontSize = 16.sp, fontFamily = RajdhaniFontFamily, color = if (userP.nodeStake >= 100) NeonGreen else Color.LightGray)
-                            Text("RELAY: 250 WEED", fontSize = 16.sp, fontFamily = RajdhaniFontFamily, color = if (userP.nodeStake >= 250) NeonGreen else Color.LightGray)
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("VALIDATOR: 500 WEED", fontSize = 16.sp, fontFamily = RajdhaniFontFamily, color = if (userP.nodeStake >= 500) NeonGreen else Color.LightGray)
-                            Text("ORACLE: 1000 WEED", fontSize = 16.sp, fontFamily = RajdhaniFontFamily, color = if (userP.nodeStake >= 1000) NeonGreen else Color.LightGray)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    var stakeInputText by remember { mutableStateOf("100") }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = stakeInputText,
-                            onValueChange = { stakeInputText = it },
-                            label = { Text("Weed Amount", fontSize = 16.sp, color = Color(0xFFB0B0C5)) },
-                            singleLine = true,
-                            textStyle = TextStyle(fontFamily = RajdhaniFontFamily, fontSize = 16.sp, color = Color.White),
-                            modifier = Modifier.weight(1f)
-                        )
-                        CyberButton(
-                            onClick = {
-                                val amt = stakeInputText.toIntOrNull() ?: 0
-                                if (amt > 0) viewModel.stakeSwarmWeed(amt)
-                            },
-                            skin = currentSkin,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.height(48.dp)
-                        ) {
-                            AutoResizingText("STAKE", targetTextSize = 11.sp, fontFamily = RajdhaniFontFamily, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                        }
-                        CyberButton(
-                            onClick = {
-                                val amt = stakeInputText.toIntOrNull() ?: 0
-                                if (amt > 0) viewModel.unstakeSwarmWeed(amt)
-                            },
-                            skin = currentSkin,
-                            containerColor = Color.Black,
-                            contentColor = Color.White,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.height(48.dp)
-                        ) {
-                            AutoResizingText("UNSTAKE", targetTextSize = 11.sp, fontFamily = RajdhaniFontFamily, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.Black, RoundedCornerShape(4.dp))
-                            .border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp))
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("NODE LIVE UPTIME", fontSize = 15.sp, fontFamily = RajdhaniFontFamily, color = Color(0xFFB0B0C5))
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text("${userP.nodeUptimeMinutes} mins", fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = RajdhaniFontFamily, color = NeonGreen)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("OFFLINE PENALTY ENGINE", fontSize = 15.sp, fontFamily = RajdhaniFontFamily, color = Color.Red)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text("50% Slashed if Offline >15m", fontSize = 16.sp, fontFamily = RajdhaniFontFamily, color = Color.LightGray)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    CyberButton(
-                        onClick = { viewModel.simulateFifteenMinutesOffline() },
-                        skin = currentSkin,
-                        containerColor = Color(0xFF3A1010),
-                        contentColor = Color.Red,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().height(44.dp)
-                    ) {
-                        AutoResizingText("SIMULATE 15-MINUTE OUTAGE (PENALTY SLASH TEST)", targetTextSize = 10.sp, fontFamily = RajdhaniFontFamily, color = Color.Red, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                    }
-                }
-            }
-        }
-
-        // 3b. CHANNEL BANDWIDTH SPEED TESTER
-        item {
-            val userP = profile ?: UserProfile()
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CyberCharcoal),
-                border = BorderStroke(1.dp, if (userP.nodeBandwidthMbps >= 3.0) NeonCyan.copy(alpha = 0.4f) else Color.Red.copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "DECENTRALIZED TRANSIT CHANNEL BANDWIDTH",
-                        fontFamily = RajdhaniFontFamily,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (userP.nodeBandwidthMbps >= 3.0) NeonCyan else Color.Red
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Nodes must maintain a minimum transit channel speed of 3.0 Mbps to assist global routing maps. Nodes falling below this threshold are temporarily isolated from public rating leaderboards, remaining reserved exclusively for private personal projects.",
-                        fontSize = 16.sp,
-                        fontFamily = RajdhaniFontFamily,
-                        color = Color.LightGray,
-                        lineHeight = 15.sp
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.Black, RoundedCornerShape(4.dp))
-                            .border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp))
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("MEASURED TRANSIT SPEED", fontSize = 15.sp, fontFamily = RajdhaniFontFamily, color = Color(0xFFB0B0C5))
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text("${String.format("%.2f", userP.nodeBandwidthMbps)} Mbps", fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = RajdhaniFontFamily, color = if (userP.nodeBandwidthMbps >= 3.0) NeonGreen else Color.Red)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("ROUTING PROTOCOL STATE", fontSize = 15.sp, fontFamily = RajdhaniFontFamily, color = Color(0xFFB0B0C5))
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (userP.nodeBandwidthMbps >= 3.0) "🟢 ELIGIBLE" else "⚠️ LOCAL ONLY",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = RajdhaniFontFamily,
-                                color = if (userP.nodeBandwidthMbps >= 3.0) NeonGreen else Color.Yellow
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    if (isSpeedTesting) {
-                        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = NeonCyan, modifier = Modifier.size(28.dp))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Testing network transit speed... Please stand by.", fontSize = 16.sp, fontFamily = RajdhaniFontFamily, color = Color.LightGray)
-                        }
-                    } else {
-                        CyberButton(
-                            onClick = { viewModel.runBandwidthSpeedTest() },
-                            skin = currentSkin,
-                            containerColor = NeonCyan,
-                            contentColor = CyberObsidian,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth().height(48.dp)
-                        ) {
-                            AutoResizingText("RUN CHANNEL BANDWIDTH SPEED TEST", targetTextSize = 11.sp, fontFamily = RajdhaniFontFamily, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                        }
-                    }
-                }
-            }
-        }
-
-        // 4. ZERO-TRACKER DECENTRALIZED P2P NETWORK CORE
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CyberCharcoal),
-                border = BorderStroke(1.dp, if (nodeActive) NeonCyan.copy(alpha = 0.4f) else Color.DarkGray),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "DECENTRAL SWARM P2P NETWORK COORDINATOR",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (nodeActive) NeonCyan else Color.White
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .background(if (nodeActive) NeonCyan else Color.Red, CircleShape)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Configures local discovery, routing, and transit protocols. Zero external tracking. Uses UDP local socket broadcasts to exchange network maps directly between devices.",
-                        fontSize = 16.sp,
-                        fontFamily = RajdhaniFontFamily,
-                        color = Color.LightGray,
-                        lineHeight = 15.sp
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Text(
-                        text = "SELECT SWARM OPERATIONAL MODE / ROLE LEVEL:",
-                        fontFamily = RajdhaniFontFamily,
-                        fontSize = 15.sp,
-                        color = Color(0xFFB0B0C5)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    val roles = listOf("Storage", "Relay", "Validator", "Oracle")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        roles.forEach { r ->
-                            val isSel = nodeRole == r
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .background(
-                                        if (isSel) NeonCyan.copy(alpha = 0.15f) else Color.Transparent,
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .border(1.dp, if (isSel) NeonCyan else Color.DarkGray, RoundedCornerShape(4.dp))
-                                    .clickable { viewModel.setSwarmNodeRole(r) }
-                                    .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
+                            Column(horizontalAlignment = Alignment.End) {
                                 Text(
-                                    text = r.uppercase(),
-                                    fontSize = 16.sp,
-                                    fontFamily = RajdhaniFontFamily,
-                                    color = if (isSel) NeonCyan else Color(0xFFB0B0C5),
-                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal
+                                    text = "${rankNode.stake} STAKED",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontFamily = IbmPlexMonoFontFamily,
+                                    color = c.emeraldGlow
                                 )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.Black, RoundedCornerShape(4.dp))
-                            .border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp))
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "SWARM NODE PROTOCOL:",
-                                fontFamily = RajdhaniFontFamily,
-                                fontSize = 15.sp,
-                                color = Color(0xFFB0B0C5)
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (nodeActive) "UDP BROADCASTER ONLINE" else "OFFLINE",
-                                fontFamily = RajdhaniFontFamily,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (nodeActive) NeonCyan else Color.Red
-                            )
-                        }
-                        Switch(
-                            checked = nodeActive,
-                            onCheckedChange = { active ->
-                                if (active) viewModel.startSwarmNode() else viewModel.stopSwarmNode()
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = NeonCyan,
-                                checkedTrackColor = NeonCyan.copy(alpha = 0.3f),
-                                uncheckedThumbColor = Color.Gray,
-                                uncheckedTrackColor = Color.Black
-                            )
-                        )
-                    }
-
-                    if (nodeActive) {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text(
-                            text = "DISCOVERED SWARM NEIGHBORS (PEERS ON SUBNET):",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 15.sp,
-                            color = Color(0xFFB0B0C5)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        if (peers.isEmpty()) {
-                            Text(
-                                text = "Scanning local subnet... UDP Port 9944 broadcast active. Ensure other nodes are running on the network.",
-                                fontSize = 16.sp,
-                                fontFamily = RajdhaniFontFamily,
-                                color = Color(0xFFB0B0C5),
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                peers.forEach { peer ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(Color(0xFF0D0D15), RoundedCornerShape(4.dp))
-                                            .border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp))
-                                            .padding(10.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "${peer.id} (${peer.ip})",
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                fontFamily = RajdhaniFontFamily,
-                                                color = Color.White
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = "Role: ${peer.role} | Cap: ${peer.allocatedGb} GB",
-                                                fontSize = 15.sp,
-                                                fontFamily = RajdhaniFontFamily,
-                                                color = Color(0xFFB0B0C5)
-                                            )
-                                            Spacer(modifier = Modifier.height(6.dp))
-                                            CyberButton(
-                                                onClick = {
-                                                    viewModel.fetchSwarmShardBlockFromPeer(peer.ip, selectedShardIndex) { result ->
-                                                        decryptedShardOutput = result ?: "EMPTY CHUNK"
-                                                    }
-                                                },
-                                                skin = currentSkin,
-                                                containerColor = Color.Black,
-                                                contentColor = currentSkin.primaryColor,
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                                modifier = Modifier.height(28.dp),
-                                                shape = RoundedCornerShape(12.dp)
-                                            ) {
-                                                AutoResizingText(
-                                                    text = "STREAM SHARD #$selectedShardIndex",
-                                                    targetTextSize = 9.sp,
-                                                    fontFamily = RajdhaniFontFamily,
-                                                    fontWeight = FontWeight.Bold,
-                                                    textAlign = TextAlign.Center
-                                                )
-                                            }
-                                        }
-                                        Card(
-                                            colors = CardDefaults.cardColors(containerColor = Color.Black),
-                                            border = BorderStroke(1.dp, NeonGreen.copy(alpha = 0.3f))
-                                        ) {
-                                            Text(
-                                                text = peer.status,
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                fontFamily = RajdhaniFontFamily,
-                                                color = NeonGreen,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Text(
-                        text = "NODE REAL-TIME SIGNAL STREAM:",
-                        fontFamily = RajdhaniFontFamily,
-                        fontSize = 15.sp,
-                        color = Color(0xFFB0B0C5)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(130.dp)
-                            .background(Color.Black, RoundedCornerShape(4.dp))
-                            .border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp))
-                            .padding(10.dp)
-                    ) {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            items(logs) { log ->
+                                Spacer(modifier = Modifier.height(Space.xxs))
                                 Text(
-                                    text = log,
-                                    fontSize = 15.sp,
-                                    fontFamily = RajdhaniFontFamily,
-                                    color = if (log.contains("Critical") || log.contains("Error")) Color.Red else if (log.contains("📡") || log.contains("SWARM")) NeonCyan else Color.LightGray,
-                                    lineHeight = 13.sp
+                                    text = rankNode.status,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (rankNode.status == "ONLINE") c.emeraldGlow else if (rankNode.status == "LOW_SPEED") NeonAmber else c.danger
                                 )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 4a. GLOBAL DECENTRALIZED NODE LEADERBOARD
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CyberCharcoal),
-                border = BorderStroke(1.dp, Color.DarkGray),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "GLOBAL DECENTRALIZED CLUSTER RANKINGS",
-                        fontFamily = RajdhaniFontFamily,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Real-time ranking of active nodes on the Sub-Zero swarm. Rank index is determined primarily by locked WEED escrow stake, rewarding high-fidelity uptime and commitment to the collective storage grid.",
-                        fontSize = 16.sp,
-                        fontFamily = RajdhaniFontFamily,
-                        color = Color.LightGray,
-                        lineHeight = 15.sp
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        leaderboard.forEachIndexed { idx, rankNode ->
-                            val isUser = rankNode.isUser
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        if (isUser) NeonCyan.copy(alpha = 0.08f) else Color(0xFF0A0A0F),
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isUser) NeonCyan else Color.DarkGray,
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .padding(10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "#${idx + 1}",
-                                        fontSize = 16.sp,
-                                        fontFamily = RajdhaniFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isUser) NeonCyan else Color(0xFFB0B0C5),
-                                        modifier = Modifier.width(32.dp)
-                                    )
-                                    Column {
-                                        Text(
-                                            text = rankNode.name,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = RajdhaniFontFamily,
-                                            color = if (isUser) NeonCyan else Color.White
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "Role: ${rankNode.role} | Bandwidth: ${String.format("%.1f", rankNode.speedMbps)} Mbps",
-                                            fontSize = 15.sp,
-                                            fontFamily = RajdhaniFontFamily,
-                                            color = Color(0xFFB0B0C5)
-                                        )
-                                    }
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "${rankNode.stake} STAKED",
-                                        fontSize = 16.sp,
-                                        fontFamily = RajdhaniFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        color = NeonGreen
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = rankNode.status,
-                                        fontSize = 15.sp,
-                                        fontFamily = RajdhaniFontFamily,
-                                        color = if (rankNode.status == "ONLINE") NeonGreen else if (rankNode.status == "LOW_SPEED") Color.Yellow else Color.Red
-                                    )
-                                }
                             }
                         }
                     }

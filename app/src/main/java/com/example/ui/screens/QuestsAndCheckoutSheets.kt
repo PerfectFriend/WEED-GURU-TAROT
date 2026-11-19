@@ -4,37 +4,74 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.ui.theme.*
+import com.example.ui.components.CyberActionButton
+import com.example.ui.components.CyberNeonButton
+import com.example.ui.components.CyberPanel
+import com.example.ui.theme.Cyber
+import com.example.ui.theme.CyberObsidian
+import com.example.ui.theme.CyberShapes
+import com.example.ui.theme.CyberSkin
+import com.example.ui.theme.IbmPlexMonoFontFamily
+import com.example.ui.theme.NeonCyan
+import com.example.ui.theme.NeonGreen
+import com.example.ui.theme.NeonMagenta
+import com.example.ui.theme.Space
 import com.example.viewmodel.TarotViewModel
+import java.util.Locale
+import kotlinx.coroutines.delay
 
 @Composable
 fun BlessingQuestsHubDialog(
     viewModel: TarotViewModel,
     onDismiss: () -> Unit
 ) {
+    val c = Cyber.colors
     val currentSkin by viewModel.currentSkin.collectAsStateWithLifecycle()
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
     val lang = profile?.systemLanguage ?: "en"
 
-    // Quest states
     val completedScan by viewModel.questCompletedScan.collectAsStateWithLifecycle()
     val claimedScan by viewModel.questClaimedScan.collectAsStateWithLifecycle()
     val completedProxy by viewModel.questCompletedProxy.collectAsStateWithLifecycle()
@@ -42,32 +79,28 @@ fun BlessingQuestsHubDialog(
     val completedTip by viewModel.questCompletedTip.collectAsStateWithLifecycle()
     val claimedTip by viewModel.questClaimedTip.collectAsStateWithLifecycle()
 
-    // Buff states
     val uptimeBuff by viewModel.blessingUptimeBuff.collectAsStateWithLifecycle()
     val rareCardBuff by viewModel.blessingRareCardBuff.collectAsStateWithLifecycle()
     val isVipUnlocked by viewModel.isVipUnlocked.collectAsStateWithLifecycle()
 
-    var activeTab by remember { mutableStateOf(0) } // 0: Quests, 1: Blessings & Tips
-
-    // Micro payment state
+    var activeTab by remember { mutableIntStateOf(0) }
     var showCheckoutSheet by remember { mutableStateOf<Map<String, Any>?>(null) }
 
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.85f)
-                .padding(16.dp),
-            colors = CardDefaults.cardColors(containerColor = CyberObsidian),
-            border = BorderStroke(2.dp, currentSkin.primaryColor),
-            shape = RoundedCornerShape(16.dp)
+                .padding(Space.sm),
+            colors = CardDefaults.cardColors(containerColor = c.panel),
+            border = BorderStroke(1.5.dp, currentSkin.primaryColor),
+            shape = CyberShapes.card
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .padding(Space.lg)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -75,92 +108,71 @@ fun BlessingQuestsHubDialog(
                 ) {
                     Text(
                         text = if (lang == "ru") "МАТРИЦА УСЛУГ И КВЕСТОВ" else "MATRIX SERVICES & QUESTS",
-                        fontSize = 16.sp,
-                        color = NeonCyan,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = RajdhaniFontFamily
+                        style = MaterialTheme.typography.titleMedium,
+                        color = c.goldLeaf,
+                        modifier = Modifier.weight(1f)
                     )
-                    IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = c.textMid)
                     }
                 }
 
-                // Balance Info
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(ElegantIndigo.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                        .padding(8.dp),
+                        .background(c.panelRaised, CyberShapes.chip)
+                        .padding(Space.md),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = if (lang == "ru") "Текущий баланс:" else "Current Balance:",
-                        fontSize = 16.sp,
-                        color = Color.LightGray,
-                        fontFamily = RajdhaniFontFamily
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = c.textMid
                     )
                     Text(
                         text = "${profile?.weed ?: 0} WEED",
-                        fontSize = 14.sp,
-                        color = NeonGreen,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = RajdhaniFontFamily
+                        style = MaterialTheme.typography.titleSmall.copy(fontFamily = IbmPlexMonoFontFamily),
+                        color = c.accent
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(Space.md))
 
-                // Tabs Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Space.sm)
                 ) {
-                    CyberButton(
+                    CyberActionButton(
+                        text = if (lang == "ru") "Daily Квесты" else "Daily Quests",
                         onClick = { activeTab = 0 },
-                        skin = currentSkin,
-                        containerColor = if (activeTab == 0) currentSkin.primaryColor else ElegantIndigo,
-                        contentColor = if (activeTab == 0) CyberObsidian else Color.White,
-                        modifier = Modifier.weight(1f).height(40.dp)
-                    ) {
-                        Text(
-                            text = if (lang == "ru") "Daily Квесты" else "Daily Quests",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = RajdhaniFontFamily
-                        )
-                    }
-                    CyberButton(
+                        secondary = activeTab != 0,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CyberActionButton(
+                        text = if (lang == "ru") "Дары и Бусты" else "Blessings & Tips",
                         onClick = { activeTab = 1 },
-                        skin = currentSkin,
-                        containerColor = if (activeTab == 1) currentSkin.primaryColor else ElegantIndigo,
-                        contentColor = if (activeTab == 1) CyberObsidian else Color.White,
-                        modifier = Modifier.weight(1f).height(40.dp)
-                    ) {
-                        Text(
-                            text = if (lang == "ru") "Дары и Бусты" else "Blessings & Tips",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = RajdhaniFontFamily
-                        )
-                    }
+                        secondary = activeTab != 1,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(Space.md))
 
-                // Tab Content
                 Box(modifier = Modifier.weight(1f)) {
                     if (activeTab == 0) {
                         LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(Space.md),
                             modifier = Modifier.fillMaxSize()
                         ) {
                             item {
                                 Text(
                                     text = if (lang == "ru") "Выполняйте задания для получения свободных кредитов:" else "Complete cyber tasks to harvest free WEED credits:",
-                                    fontSize = 16.sp,
-                                    color = Color(0xFFB0B0C5),
-                                    modifier = Modifier.padding(bottom = 8.dp)
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = c.textMid
                                 )
                             }
                             item {
@@ -198,35 +210,25 @@ fun BlessingQuestsHubDialog(
                             }
 
                             item {
-                                Spacer(modifier = Modifier.height(16.dp))
-                                CyberButton(
+                                Spacer(modifier = Modifier.height(Space.sm))
+                                CyberActionButton(
+                                    text = if (lang == "ru") "СБРОСИТЬ КВЕСТЫ (ДЕБАГ)" else "RESET QUESTS (DEBUG)",
                                     onClick = { viewModel.resetDailyQuests() },
-                                    skin = currentSkin,
-                                    containerColor = CyberMutedBlue,
-                                    modifier = Modifier.fillMaxWidth().height(44.dp)
-                                ) {
-                                    Text(
-                                        text = if (lang == "ru") "🔄 СБРОСИТЬ КВЕСТЫ (ДЕБАГ)" else "🔄 RESET QUESTS (DEBUG)",
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = RajdhaniFontFamily,
-                                        color = Color.White
-                                    )
-                                }
+                                    secondary = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
                     } else {
                         LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(Space.md),
                             modifier = Modifier.fillMaxSize()
                         ) {
                             item {
                                 Text(
-                                    text = if (lang == "ru") "ПОЖЕРТВОВАНИЯ КРЕДИТОВ (ВЫГОДНЫЕ БУСТЫ)" else "CREDIT BLESSINGS (IN-GAME BUFFS)",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NeonMagenta,
-                                    fontFamily = RajdhaniFontFamily
+                                    text = if (lang == "ru") "ПОЖЕРТВОВАНИЯ КРЕДИТОВ (БУСТЫ)" else "CREDIT BLESSINGS (IN-GAME BUFFS)",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = NeonMagenta
                                 )
                             }
 
@@ -264,28 +266,26 @@ fun BlessingQuestsHubDialog(
                             }
 
                             item {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                HorizontalDivider(color = Color(0xFFB0B0C5).copy(alpha = 0.2f))
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(Space.xs))
+                                HorizontalDivider(color = c.goldAntique.copy(alpha = 0.25f))
+                                Spacer(modifier = Modifier.height(Space.xs))
                                 Text(
-                                    text = if (lang == "ru") "МИКРОТРАНЗАКЦИИ СВЯЗИ (МАССОВАЯ МОНЕТИЗАЦИЯ)" else "MATRIX GATEWAY MICRO-DONATIONS (MONETIZATION)",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NeonCyan,
-                                    fontFamily = RajdhaniFontFamily
+                                    text = if (lang == "ru") "МИКРОТРАНЗАКЦИИ СВЯЗИ" else "MATRIX GATEWAY MICRO-DONATIONS",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = NeonCyan
                                 )
                                 Text(
                                     text = if (lang == "ru") "Реалистичная симуляция платежного шлюза. Дешево, доступно, надежно." else "Simulated secure credit micro-payments. Ultra cheap, mass adoption model.",
-                                    fontSize = 16.sp,
-                                    color = Color(0xFFB0B0C5),
-                                    modifier = Modifier.padding(vertical = 4.dp)
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = c.textMid,
+                                    modifier = Modifier.padding(top = Space.xxs)
                                 )
                             }
 
                             item {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(Space.sm)
                                 ) {
                                     MicroPayCard(
                                         title = if (lang == "ru") "Микро-Искра" else "Spark Matrix",
@@ -367,88 +367,71 @@ fun QuestItemRow(
     lang: String,
     onClaim: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF14121E), RoundedCornerShape(12.dp))
-            .border(1.dp, if (isCompleted && !isClaimed) NeonCyan.copy(alpha = 0.5f) else Color.Transparent, RoundedCornerShape(12.dp))
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    val c = Cyber.colors
+    CyberPanel(
+        borderColor = if (isCompleted && !isClaimed) NeonCyan.copy(alpha = 0.55f) else c.goldAntique.copy(alpha = 0.2f),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                    contentDescription = null,
-                    tint = if (isCompleted) NeonGreen else Color(0xFFB0B0C5),
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                        contentDescription = null,
+                        tint = if (isCompleted) NeonGreen else c.textMid,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(Space.xs))
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = c.textHigh
+                    )
+                }
+                Spacer(modifier = Modifier.height(Space.xxs))
                 Text(
-                    text = title,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    fontFamily = RajdhaniFontFamily
+                    text = desc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMid
+                )
+                Spacer(modifier = Modifier.height(Space.xxs))
+                Text(
+                    text = "+$reward WEED",
+                    style = MaterialTheme.typography.labelLarge.copy(fontFamily = IbmPlexMonoFontFamily),
+                    color = c.accent
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = desc,
-                fontSize = 15.sp,
-                color = Color.LightGray,
-                fontFamily = RajdhaniFontFamily
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "🎁 +$reward WEED",
-                fontSize = 16.sp,
-                color = NeonGreen,
-                fontWeight = FontWeight.Bold,
-                fontFamily = RajdhaniFontFamily
-            )
-        }
 
-        Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(Space.sm))
 
-        if (isClaimed) {
-            Text(
-                text = if (lang == "ru") "ПОЛУЧЕНО" else "CLAIMED",
-                fontSize = 16.sp,
-                color = Color(0xFFB0B0C5),
-                fontWeight = FontWeight.Bold,
-                fontFamily = RajdhaniFontFamily,
-                modifier = Modifier
-                    .background(Color(0x10FFFFFF), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-            )
-        } else if (isCompleted) {
-            Button(
-                onClick = onClaim,
-                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.height(34.dp)
-            ) {
+            if (isClaimed) {
                 Text(
+                    text = if (lang == "ru") "ПОЛУЧЕНО" else "CLAIMED",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = c.textMid,
+                    modifier = Modifier
+                        .background(c.ink, CyberShapes.chip)
+                        .padding(horizontal = Space.sm, vertical = Space.xs)
+                )
+            } else if (isCompleted) {
+                CyberActionButton(
                     text = if (lang == "ru") "ЗАБРАТЬ" else "CLAIM",
-                    fontSize = 16.sp,
-                    color = CyberObsidian,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = RajdhaniFontFamily
+                    onClick = onClaim
+                )
+            } else {
+                Text(
+                    text = if (lang == "ru") "В ПРОЦЕССЕ" else "IN PROGRESS",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = c.textMid,
+                    modifier = Modifier
+                        .background(c.ink, CyberShapes.chip)
+                        .padding(horizontal = Space.sm, vertical = Space.xs)
                 )
             }
-        } else {
-            Text(
-                text = if (lang == "ru") "В ПРОЦЕССЕ" else "IN PROGRESS",
-                fontSize = 15.sp,
-                color = Color(0xFFB0B0C5),
-                fontFamily = RajdhaniFontFamily,
-                modifier = Modifier
-                    .background(Color(0x05FFFFFF), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-            )
         }
     }
 }
@@ -462,59 +445,46 @@ fun BlessingItemRow(
     lang: String,
     onBuy: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF14121E), RoundedCornerShape(12.dp))
-            .border(1.dp, if (isActive) NeonMagenta.copy(alpha = 0.5f) else Color.Transparent, RoundedCornerShape(12.dp))
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    val c = Cyber.colors
+    CyberPanel(
+        borderColor = if (isActive) NeonMagenta.copy(alpha = 0.55f) else c.goldAntique.copy(alpha = 0.2f),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isActive) NeonMagenta else Color.White,
-                fontFamily = RajdhaniFontFamily
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = desc,
-                fontSize = 15.sp,
-                color = Color.LightGray,
-                fontFamily = RajdhaniFontFamily
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        if (isActive) {
-            Text(
-                text = if (lang == "ru") "АКТИВНО" else "ACTIVE",
-                fontSize = 16.sp,
-                color = NeonMagenta,
-                fontWeight = FontWeight.Bold,
-                fontFamily = RajdhaniFontFamily,
-                modifier = Modifier
-                    .background(NeonMagenta.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-            )
-        } else {
-            Button(
-                onClick = onBuy,
-                colors = ButtonDefaults.buttonColors(containerColor = ElegantIndigo),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.height(34.dp)
-            ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (isActive) NeonMagenta else c.textHigh
+                )
+                Spacer(modifier = Modifier.height(Space.xxs))
+                Text(
+                    text = desc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMid
+                )
+            }
+
+            Spacer(modifier = Modifier.width(Space.md))
+
+            if (isActive) {
+                Text(
+                    text = if (lang == "ru") "АКТИВНО" else "ACTIVE",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = NeonMagenta,
+                    modifier = Modifier
+                        .background(NeonMagenta.copy(alpha = 0.15f), CyberShapes.chip)
+                        .padding(horizontal = Space.sm, vertical = Space.xs)
+                )
+            } else {
+                CyberActionButton(
                     text = costText,
-                    fontSize = 16.sp,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = RajdhaniFontFamily
+                    onClick = onBuy,
+                    secondary = true
                 )
             }
         }
@@ -529,48 +499,45 @@ fun MicroPayCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val c = Cyber.colors
     Card(
         modifier = modifier
-            .height(115.dp)
+            .heightIn(min = 120.dp)
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF14121E)),
-        border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.25f)),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = c.panelRaised),
+        border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.35f)),
+        shape = CyberShapes.control
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(8.dp),
+                .padding(Space.sm),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
                 text = title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.LightGray,
-                fontFamily = RajdhaniFontFamily,
+                style = MaterialTheme.typography.labelLarge,
+                color = c.textHigh,
                 textAlign = TextAlign.Center
             )
             Text(
                 text = reward,
-                fontSize = 15.sp,
-                color = NeonGreen,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = RajdhaniFontFamily,
-                textAlign = TextAlign.Center,
-                lineHeight = 12.sp
+                style = MaterialTheme.typography.labelSmall.copy(fontFamily = IbmPlexMonoFontFamily),
+                color = c.accent,
+                textAlign = TextAlign.Center
             )
             Text(
                 text = price,
-                fontSize = 17.sp,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontFamily = IbmPlexMonoFontFamily,
+                    fontWeight = FontWeight.Black
+                ),
                 color = CyberObsidian,
-                fontWeight = FontWeight.Black,
-                fontFamily = RajdhaniFontFamily,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(NeonCyan, RoundedCornerShape(6.dp))
-                    .padding(vertical = 4.dp),
+                    .background(NeonCyan, CyberShapes.chip)
+                    .padding(vertical = Space.xs),
                 textAlign = TextAlign.Center
             )
         }
@@ -586,187 +553,153 @@ fun SimulatedCheckoutSheet(
     lang: String,
     currentSkin: CyberSkin
 ) {
-    var step by remember { mutableStateOf(0) } // 0: Payment Method, 1: Processing, 2: Done
+    val c = Cyber.colors
+    var step by remember { mutableIntStateOf(0) }
 
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0A15)),
-            border = BorderStroke(2.5.dp, NeonCyan),
-            shape = RoundedCornerShape(16.dp)
+                .padding(Space.sm),
+            colors = CardDefaults.cardColors(containerColor = c.panel),
+            border = BorderStroke(2.dp, currentSkin.primaryColor),
+            shape = CyberShapes.card
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
+                    .padding(Space.xl),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (step == 0) {
-                    Text(
-                        text = if (lang == "ru") "ЗАЩИЩЕННЫЙ ПЛАТЕЖ" else "SECURE GATEWAY CHECKOUT",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NeonCyan,
-                        fontFamily = RajdhaniFontFamily,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    HorizontalDivider(color = Color(0xFFB0B0C5).copy(alpha = 0.2f))
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = title,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
-                        fontFamily = RajdhaniFontFamily
-                    )
-                    Text(
-                        text = "\$${String.format("%.2f", priceUsd)} USD",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Black,
-                        color = NeonGreen,
-                        fontFamily = RajdhaniFontFamily,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(ElegantIndigo.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.CreditCard,
-                                contentDescription = "Card",
-                                tint = NeonCyan,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "VISA •••• 4012",
-                                fontSize = 14.sp,
-                                color = Color.White,
-                                fontFamily = RajdhaniFontFamily
-                            )
-                        }
+                when (step) {
+                    0 -> {
                         Text(
-                            text = "GPAY",
-                            fontSize = 16.sp,
-                            color = CyberObsidian,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = RajdhaniFontFamily,
-                            modifier = Modifier
-                                .background(Color.White, RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                            text = if (lang == "ru") "ЗАЩИЩЕННЫЙ ПЛАТЕЖ" else "SECURE GATEWAY CHECKOUT",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = NeonCyan,
+                            modifier = Modifier.padding(bottom = Space.md)
                         )
-                    }
+                        HorizontalDivider(color = c.goldAntique.copy(alpha = 0.25f))
+                        Spacer(modifier = Modifier.height(Space.md))
 
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        CyberButton(
-                            onClick = onDismiss,
-                            skin = currentSkin,
-                            containerColor = Color.Gray.copy(alpha = 0.2f),
-                            modifier = Modifier.weight(1f).height(44.dp)
-                        ) {
-                            Text(
-                                text = if (lang == "ru") "ОТМЕНА" else "CANCEL",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontFamily = RajdhaniFontFamily
-                            )
-                        }
-                        CyberButton(
-                            onClick = {
-                                step = 1
-                            },
-                            skin = currentSkin,
-                            containerColor = NeonGreen,
-                            contentColor = CyberObsidian,
-                            modifier = Modifier.weight(1.5f).height(44.dp)
-                        ) {
-                            Text(
-                                text = if (lang == "ru") "ПОДТВЕРДИТЬ И ОПЛАТИТЬ" else "CONFIRM & PAY",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = RajdhaniFontFamily
-                            )
-                        }
-                    }
-                } else if (step == 1) {
-                    Text(
-                        text = if (lang == "ru") "АВТОРИЗАЦИЯ ТРАНЗАКЦИИ..." else "AUTHORIZING ENCRYPTED TUNNEL...",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NeonCyan,
-                        fontFamily = RajdhaniFontFamily
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    CircularProgressIndicator(
-                        color = NeonCyan,
-                        strokeWidth = 3.dp,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = if (lang == "ru") "Инициализация подписи контракта..." else "Securing financial quantum node consensus...",
-                        fontSize = 16.sp,
-                        color = Color(0xFFB0B0C5),
-                        fontFamily = RajdhaniFontFamily
-                    )
-
-                    LaunchedEffect(Unit) {
-                        kotlinx.coroutines.delay(2500)
-                        step = 2
-                    }
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Success",
-                        tint = NeonGreen,
-                        modifier = Modifier.size(64.dp)
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Text(
-                        text = if (lang == "ru") "ОПЛАТА УСПЕШНО ЗАВЕРШЕНА" else "TRANSACTION VERIFIED",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NeonGreen,
-                        fontFamily = RajdhaniFontFamily
-                    )
-                    Text(
-                        text = if (lang == "ru") "Ваш баланс был обновлен!" else "Your cybernetic ledger has been synchronized!",
-                        fontSize = 16.sp,
-                        color = Color.LightGray,
-                        fontFamily = RajdhaniFontFamily,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 18.dp)
-                    )
-                    CyberButton(
-                        onClick = {
-                            onSuccess()
-                        },
-                        skin = currentSkin,
-                        containerColor = NeonCyan,
-                        contentColor = CyberObsidian,
-                        modifier = Modifier.fillMaxWidth().height(44.dp)
-                    ) {
                         Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = c.textHigh
+                        )
+                        Text(
+                            text = "\$${String.format(Locale.US, "%.2f", priceUsd)} USD",
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontFamily = IbmPlexMonoFontFamily,
+                                fontWeight = FontWeight.Black
+                            ),
+                            color = c.accent,
+                            modifier = Modifier.padding(vertical = Space.sm)
+                        )
+
+                        Spacer(modifier = Modifier.height(Space.sm))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(c.panelRaised, CyberShapes.control)
+                                .padding(Space.md),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CreditCard,
+                                    contentDescription = "Card",
+                                    tint = NeonCyan,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(Space.sm))
+                                Text(
+                                    text = "VISA •••• 4012",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = IbmPlexMonoFontFamily),
+                                    color = c.textHigh
+                                )
+                            }
+                            Text(
+                                text = "GPAY",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = CyberObsidian,
+                                modifier = Modifier
+                                    .background(Color.White, CyberShapes.chip)
+                                    .padding(horizontal = Space.xs, vertical = Space.xxs)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(Space.lg))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(Space.sm)
+                        ) {
+                            CyberActionButton(
+                                text = if (lang == "ru") "ОТМЕНА" else "CANCEL",
+                                onClick = onDismiss,
+                                secondary = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            CyberActionButton(
+                                text = if (lang == "ru") "ОПЛАТИТЬ" else "CONFIRM & PAY",
+                                onClick = { step = 1 },
+                                modifier = Modifier.weight(1.4f)
+                            )
+                        }
+                    }
+                    1 -> {
+                        Text(
+                            text = if (lang == "ru") "АВТОРИЗАЦИЯ ТРАНЗАКЦИИ..." else "AUTHORIZING ENCRYPTED TUNNEL...",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = NeonCyan
+                        )
+                        Spacer(modifier = Modifier.height(Space.xl))
+                        CircularProgressIndicator(
+                            color = NeonCyan,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(Space.xl))
+                        Text(
+                            text = if (lang == "ru") "Инициализация подписи контракта..." else "Securing financial quantum node consensus...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMid,
+                            textAlign = TextAlign.Center
+                        )
+
+                        LaunchedEffect(Unit) {
+                            delay(2500)
+                            step = 2
+                        }
+                    }
+                    else -> {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Success",
+                            tint = c.accent,
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(Space.md))
+                        Text(
+                            text = if (lang == "ru") "ОПЛАТА УСПЕШНО ЗАВЕРШЕНА" else "TRANSACTION VERIFIED",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = c.accent
+                        )
+                        Text(
+                            text = if (lang == "ru") "Ваш баланс был обновлен!" else "Your cybernetic ledger has been synchronized!",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMid,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = Space.xs, bottom = Space.lg)
+                        )
+                        CyberNeonButton(
                             text = if (lang == "ru") "ОТЛИЧНО" else "ACKNOWLEDGE",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = RajdhaniFontFamily
+                            onClick = onSuccess,
+                            color = NeonCyan,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }

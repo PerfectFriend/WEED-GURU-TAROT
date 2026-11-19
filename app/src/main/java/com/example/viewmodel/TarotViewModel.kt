@@ -103,7 +103,16 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+        WatermarkStateStore.init(getApplication())
+        viewModelScope.launch {
+            repository.mintedCards.collect { cards ->
+                WatermarkStateStore.syncOwnedCards(cards)
+            }
+        }
     }
+
+    val isWatermarkUnlocked: StateFlow<Boolean> = WatermarkStateStore.isUnlocked
+    val isWatermarkHidden: StateFlow<Boolean> = WatermarkStateStore.isWatermarkHidden
 
     fun updateSkin(skin: CyberSkin) {
         sharedPrefs.edit().putString("selected_skin", skin.id).apply()
@@ -1421,6 +1430,54 @@ class TarotViewModel(application: Application) : AndroidViewModel(application) {
                 _uiNotification.value = "❌ Activation failed! Requires 500 WEED."
                 onComplete(false)
             }
+        }
+    }
+
+    fun purchaseGenesisWatermarkEliminator(
+        payWithUsdc: Boolean = true,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val success = repository.purchaseGenesisWatermarkEliminator(payWithUsdc)
+            val lang = userProfile.value?.systemLanguage ?: "en"
+            if (success) {
+                _uiNotification.value = if (lang == "ru") {
+                    "👑 GENESIS WATERMARK ELIMINATOR активирован! Снятие полноэкранной вотермарки разблокировано."
+                } else {
+                    "👑 GENESIS WATERMARK ELIMINATOR acquired! Fullscreen watermark removal unlocked."
+                }
+                com.example.audio.CyberNoirSynthPlayer.triggerFX(
+                    com.example.audio.CyberNoirSynthPlayer.FXType.SUCCESS_CHIME
+                )
+            } else {
+                _uiNotification.value = if (lang == "ru") {
+                    if (payWithUsdc) {
+                        "❌ Недостаточно USDC. Требуется 5.99 USDC ($5.99)."
+                    } else {
+                        "❌ Недостаточно WEED. Требуется 60 WEED ($5.99 экв.)."
+                    }
+                } else {
+                    if (payWithUsdc) {
+                        "❌ Insufficient USDC balance. Requires 5.99 USDC ($5.99)."
+                    } else {
+                        "❌ Insufficient WEED credits. Requires 60 WEED ($5.99 eq.)."
+                    }
+                }
+            }
+            onComplete(success)
+        }
+    }
+
+    fun toggleFullscreenWatermark(hidden: Boolean) {
+        if (!WatermarkStateStore.isUnlocked.value && hidden) return
+        WatermarkStateStore.setWatermarkHidden(hidden, getApplication())
+        val lang = userProfile.value?.systemLanguage ?: "en"
+        _uiNotification.value = if (hidden) {
+            if (lang == "ru") "✨ Полноэкранная вотермарка WEED GURU PROPERTY скрыта."
+            else "✨ Fullscreen WEED GURU PROPERTY watermark hidden."
+        } else {
+            if (lang == "ru") "🌿 Полноэкранная вотермарка WEED GURU PROPERTY включена."
+            else "🌿 Fullscreen WEED GURU PROPERTY watermark enabled."
         }
     }
 

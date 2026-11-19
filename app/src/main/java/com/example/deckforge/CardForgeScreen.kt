@@ -21,7 +21,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,6 +37,14 @@ import com.example.duel.ElementAffinity
 import com.example.ui.components.FramedTarotArtworkWindow
 import com.example.ui.components.WeedGuruCardInspectorDialog
 import com.example.ui.components.getArcanaRomanNumeral
+import com.example.ui.theme.Cyber
+import com.example.ui.theme.CyberShapes
+import com.example.ui.theme.ElegantViolet
+import com.example.ui.theme.IbmPlexMonoFontFamily
+import com.example.ui.theme.NeonAmber
+import com.example.ui.theme.NeonCyan
+import com.example.ui.theme.Space
+import com.example.ui.theme.rememberMotionEnabled
 import com.example.viewmodel.TarotViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,57 +86,63 @@ fun CardForgeScreen(
     }
 
     // Animation for card hologram glow
-    val infiniteTransition = rememberInfiniteTransition(label = "forge_glow")
-    val glowPulse by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow"
-    )
+    val motionEnabled = rememberMotionEnabled()
+    val glowPulse = if (motionEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "forge_glow")
+        infiniteTransition.animateFloat(
+            initialValue = 0.5f,
+            targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "glow"
+        ).value
+    } else {
+        0.75f
+    }
 
+    val c = Cyber.colors
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF050811))
-            .padding(horizontal = 12.dp)
+            .background(c.ink)
+            .padding(horizontal = Space.md)
             .testTag("card_forge_screen")
     ) {
         // Header Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
+                .padding(vertical = Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
                 if (onBack != null) {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = c.textHigh
                         )
                     }
                 }
-                Column(modifier = Modifier.weight(1f).padding(end = 6.dp)) {
+                Column(modifier = Modifier.weight(1f).padding(end = Space.xs)) {
                     Text(
                         text = if (lang == "ru") "КУЗНИЦА АРКАНОВ" else "ARCANA FORGE & SYNTHESIS",
-                        color = Color(0xFFFFD700),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = c.goldLeaf,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = if (lang == "ru") "Прокачка силы, брони, RAM и скинов" else "Enhance ATK, DEF, RAM cost & holographic skins",
-                        color = Color.Gray,
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
+                        text = if (lang == "ru") "Сила, броня, RAM и скины" else "Enhance ATK, DEF, RAM & skins",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = c.textMid,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -138,43 +151,47 @@ fun CardForgeScreen(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(Space.xs)
             ) {
-                // AI Forge Switch Button
                 OutlinedButton(
                     onClick = {
                         CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
                         isAiForgeOpen = true
                     },
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, Color(0xFF00F5FF)),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.height(30.dp)
+                    shape = CyberShapes.chip,
+                    border = BorderStroke(1.dp, NeonCyan),
+                    contentPadding = PaddingValues(horizontal = Space.sm, vertical = Space.xs),
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
-                    Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFF00F5FF), modifier = Modifier.size(13.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (lang == "ru") "ИИ-Кузница" else "AI Forge", color = Color(0xFF00F5FF), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(Space.xs))
+                    Text(
+                        text = if (lang == "ru") "ИИ-Кузница" else "AI Forge",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = NeonCyan
+                    )
                 }
 
-                // WEED Credits Badge
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFF0D1B14),
-                    border = BorderStroke(1.dp, Color(0xFF00FF66).copy(alpha = 0.6f)),
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    shape = CyberShapes.control,
+                    color = c.panelRaised,
+                    border = BorderStroke(1.dp, c.emeraldGlow.copy(alpha = 0.6f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = Space.sm, vertical = Space.xs),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(Space.xs)
                     ) {
-                        Text(text = "🌿", fontSize = 11.sp)
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = null,
+                            tint = c.emeraldGlow,
+                            modifier = Modifier.size(14.dp)
+                        )
                         Text(
                             text = "$weedBalance",
-                            color = Color(0xFF00FF66),
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
+                            style = MaterialTheme.typography.labelSmall,
+                            color = c.emeraldGlow
                         )
                     }
                 }
@@ -184,39 +201,34 @@ fun CardForgeScreen(
         // Selected Card Holographic Workshop Stage
         val element = baseBattleCard.element
         val skinColor = when (currentUpgrade.customSkin) {
-            "BIO_TOX" -> Color(0xFF00FF66)
-            "GOLDEN_CIRCUIT" -> Color(0xFFFFD700)
-            "VOID_PHANTOM" -> Color(0xFFBD00FF)
+            "BIO_TOX" -> c.emeraldGlow
+            "GOLDEN_CIRCUIT" -> c.goldLeaf
+            "VOID_PHANTOM" -> ElegantViolet
             else -> element.color
         }
 
         Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = Color(0xFF090E1D),
+            shape = CyberShapes.control,
+            color = c.panel,
             border = BorderStroke(1.5.dp, skinColor.copy(alpha = glowPulse)),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp)
+                .padding(vertical = Space.xs)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(Space.md),
+                horizontalArrangement = Arrangement.spacedBy(Space.md),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Unified Collector 420 Tarot Card Preview Frame (with WEED GURU PROPERTY watermark)
                 Box(
                     modifier = Modifier
                         .width(126.dp)
                         .height(198.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color(0xFF131A2E), Color(0xFF070A12))
-                            )
-                        )
-                        .border(1.8.dp, skinColor, RoundedCornerShape(10.dp))
+                        .clip(CyberShapes.cardCompact)
+                        .background(Brush.verticalGradient(listOf(c.panelRaised, c.ink)))
+                        .border(1.8.dp, skinColor, CyberShapes.cardCompact)
                         .clickable { showForgeInspectDialog = true }
                         .padding(5.dp)
                 ) {
@@ -231,13 +243,12 @@ fun CardForgeScreen(
                         ) {
                             val effRam = (baseBattleCard.energyCost - currentUpgrade.energyDiscount).coerceAtLeast(1)
                             Text(
-                                text = "${getArcanaRomanNumeral(selectedCard.index)} · $effRam⚡",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFFFFB800),
+                                text = "${getArcanaRomanNumeral(selectedCard.index)} · ${effRam}RAM",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = NeonAmber,
                                 maxLines = 1
                             )
-                            Text(text = element.symbol, fontSize = 11.sp)
+                            Text(text = element.symbol, style = MaterialTheme.typography.labelSmall)
                         }
 
                         Spacer(modifier = Modifier.height(3.dp))
@@ -258,17 +269,14 @@ fun CardForgeScreen(
 
                         Text(
                             text = selectedCard.name,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = c.textHigh,
                             textAlign = TextAlign.Center,
-                            fontFamily = FontFamily.Monospace,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        // Combat Stats & Level
                         val effPwr = baseBattleCard.basePower + currentUpgrade.bonusPower
                         val effDef = baseBattleCard.baseDefense + currentUpgrade.bonusDefense
                         Row(
@@ -276,17 +284,16 @@ fun CardForgeScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "⚔$effPwr", fontSize = 10.sp, color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
-                            Text(text = "L${currentUpgrade.upgradeLevel}", fontSize = 9.sp, color = skinColor, fontWeight = FontWeight.Bold)
-                            Text(text = "🛡$effDef", fontSize = 10.sp, color = Color(0xFF00FF66), fontWeight = FontWeight.Bold)
+                            Text(text = "A:$effPwr", style = MaterialTheme.typography.labelSmall, color = c.danger)
+                            Text(text = "L${currentUpgrade.upgradeLevel}", style = MaterialTheme.typography.labelSmall, color = skinColor)
+                            Text(text = "D:$effDef", style = MaterialTheme.typography.labelSmall, color = c.emeraldGlow)
                         }
                     }
                 }
 
-                // Stats & Upgrade Controls
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(Space.xs)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -295,28 +302,29 @@ fun CardForgeScreen(
                     ) {
                         Text(
                             text = selectedCard.traditionalName,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            fontFamily = FontFamily.Monospace
+                            style = MaterialTheme.typography.titleSmall,
+                            color = c.textHigh,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
                         )
                         Text(
                             text = "★".repeat(currentUpgrade.upgradeLevel) + "☆".repeat(5 - currentUpgrade.upgradeLevel),
-                            color = Color(0xFFFFD700),
-                            fontSize = 11.sp
+                            style = MaterialTheme.typography.labelMedium,
+                            color = c.goldLeaf
                         )
                     }
 
                     baseBattleCard.specialEffect?.let { effect ->
                         Text(
-                            text = "⚡ ${if (lang == "ru") effect.titleRu else effect.titleEn}: ${if (lang == "ru") effect.descriptionRu else effect.descriptionEn}",
-                            fontSize = 10.sp,
-                            color = Color.LightGray,
-                            lineHeight = 12.sp
+                            text = "${if (lang == "ru") effect.titleRu else effect.titleEn}: ${if (lang == "ru") effect.descriptionRu else effect.descriptionEn}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMid,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    // Upgrade Power Button
                     val powerCost = 100 * currentUpgrade.upgradeLevel
                     val canAffordPwr = weedBalance >= powerCost && currentUpgrade.upgradeLevel < 5
                     OutlinedButton(
@@ -324,7 +332,7 @@ fun CardForgeScreen(
                             viewModel.upgradeCardStat(selectedCardIndex, "POWER") { success ->
                                 if (success) {
                                     CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.SUCCESS_CHIME)
-                                    upgradeFeedbackMessage = if (lang == "ru") "+1 Силы успешно синтезировано!" else "+1 Power synthesized!"
+                                    upgradeFeedbackMessage = if (lang == "ru") "+1 Силы синтезировано!" else "+1 Power synthesized!"
                                 } else {
                                     upgradeFeedbackMessage = if (lang == "ru") "Недостаточно WEED кредитов!" else "Not enough WEED credits!"
                                 }
@@ -333,31 +341,29 @@ fun CardForgeScreen(
                         enabled = canAffordPwr,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(30.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, if (canAffordPwr) Color(0xFFFF5252) else Color(0x33FFFFFF))
+                            .heightIn(min = 48.dp),
+                        contentPadding = PaddingValues(horizontal = Space.sm, vertical = Space.xs),
+                        shape = CyberShapes.chip,
+                        border = BorderStroke(1.dp, if (canAffordPwr) c.danger else c.textMid.copy(alpha = 0.25f))
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = if (lang == "ru") "⚔ Разгон Силы (+1)" else "⚔ Overclock (+1 ATK)",
-                                fontSize = 10.sp,
-                                color = if (canAffordPwr) Color(0xFFFF5252) else Color.Gray,
-                                fontWeight = FontWeight.Bold
+                                text = if (lang == "ru") "Сила (+1)" else "Overclock (+1 ATK)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (canAffordPwr) c.danger else c.textMid
                             )
                             Text(
-                                text = if (currentUpgrade.upgradeLevel < 5) "$powerCost WEED" else "MAX",
-                                fontSize = 10.sp,
-                                color = Color.White,
-                                fontFamily = FontFamily.Monospace
+                                text = if (currentUpgrade.upgradeLevel < 5) "$powerCost" else "MAX",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = c.textHigh
                             )
                         }
                     }
 
-                    // Upgrade Defense Button
                     val defCost = 100 * currentUpgrade.upgradeLevel
                     val canAffordDef = weedBalance >= defCost && currentUpgrade.upgradeLevel < 5
                     OutlinedButton(
@@ -374,31 +380,29 @@ fun CardForgeScreen(
                         enabled = canAffordDef,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(30.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, if (canAffordDef) Color(0xFF00FF66) else Color(0x33FFFFFF))
+                            .heightIn(min = 48.dp),
+                        contentPadding = PaddingValues(horizontal = Space.sm, vertical = Space.xs),
+                        shape = CyberShapes.chip,
+                        border = BorderStroke(1.dp, if (canAffordDef) c.emeraldGlow else c.textMid.copy(alpha = 0.25f))
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = if (lang == "ru") "🛡 Усиление Щита (+1)" else "🛡 Shield (+1 DEF)",
-                                fontSize = 10.sp,
-                                color = if (canAffordDef) Color(0xFF00FF66) else Color.Gray,
-                                fontWeight = FontWeight.Bold
+                                text = if (lang == "ru") "Щит (+1)" else "Shield (+1 DEF)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (canAffordDef) c.emeraldGlow else c.textMid
                             )
                             Text(
-                                text = if (currentUpgrade.upgradeLevel < 5) "$defCost WEED" else "MAX",
-                                fontSize = 10.sp,
-                                color = Color.White,
-                                fontFamily = FontFamily.Monospace
+                                text = if (currentUpgrade.upgradeLevel < 5) "$defCost" else "MAX",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = c.textHigh
                             )
                         }
                     }
 
-                    // RAM Optimization (-1 RAM cost, unlocks at Lvl 3)
                     val ramUnlocked = currentUpgrade.upgradeLevel >= 3
                     val ramAlreadyOptimized = currentUpgrade.energyDiscount > 0
                     val canAffordRam = ramUnlocked && !ramAlreadyOptimized && weedBalance >= 250
@@ -414,147 +418,138 @@ fun CardForgeScreen(
                         enabled = canAffordRam,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(30.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, if (canAffordRam) Color(0xFFFFB800) else Color(0x33FFFFFF))
+                            .heightIn(min = 48.dp),
+                        contentPadding = PaddingValues(horizontal = Space.sm, vertical = Space.xs),
+                        shape = CyberShapes.chip,
+                        border = BorderStroke(1.dp, if (canAffordRam) NeonAmber else c.textMid.copy(alpha = 0.25f))
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = if (lang == "ru") "⚡ Оптимизация RAM (-1)" else "⚡ RAM Opt (-1 RAM)",
-                                fontSize = 10.sp,
-                                color = if (canAffordRam) Color(0xFFFFB800) else Color.Gray,
-                                fontWeight = FontWeight.Bold
+                                text = if (lang == "ru") "RAM (-1)" else "RAM Opt (-1)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (canAffordRam) NeonAmber else c.textMid
                             )
                             Text(
                                 text = when {
                                     ramAlreadyOptimized -> "DONE"
-                                    !ramUnlocked -> "LVL 3 REQ"
-                                    else -> "250 WEED"
+                                    !ramUnlocked -> "LVL 3"
+                                    else -> "250"
                                 },
-                                fontSize = 10.sp,
-                                color = Color.White,
-                                fontFamily = FontFamily.Monospace
+                                style = MaterialTheme.typography.labelSmall,
+                                color = c.textHigh
                             )
                         }
                     }
                 }
             }
 
-            // Skin Matrix Bar
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF050711))
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .background(c.ink.copy(alpha = 0.85f))
+                    .padding(horizontal = Space.md, vertical = Space.sm)
             ) {
                 Text(
                     text = if (lang == "ru") "СКИН-МАТРИЦА АРКАНА:" else "HOLOGRAPHIC SKIN MATRIX:",
-                    color = Color.LightGray,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace
+                    style = MaterialTheme.typography.labelMedium,
+                    color = c.textMid
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(Space.xs))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Space.sm)
                 ) {
                     val skins = listOf(
-                        Triple("DEFAULT", if (lang == "ru") "Классик" else "Classic", Color(0xFF00F5FF)),
-                        Triple("BIO_TOX", if (lang == "ru") "Био-Токс" else "Bio-Tox", Color(0xFF00FF66)),
-                        Triple("GOLDEN_CIRCUIT", if (lang == "ru") "Золото" else "Gold", Color(0xFFFFD700)),
-                        Triple("VOID_PHANTOM", if (lang == "ru") "Пустота" else "Void", Color(0xFFBD00FF))
+                        Triple("DEFAULT", if (lang == "ru") "Классик" else "Classic", NeonCyan),
+                        Triple("BIO_TOX", if (lang == "ru") "Био-Токс" else "Bio-Tox", c.emeraldGlow),
+                        Triple("GOLDEN_CIRCUIT", if (lang == "ru") "Золото" else "Gold", c.goldLeaf),
+                        Triple("VOID_PHANTOM", if (lang == "ru") "Пустота" else "Void", ElegantViolet)
                     )
                     skins.forEach { (skinKey, label, color) ->
                         val isSelected = currentUpgrade.customSkin == skinKey
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (isSelected) color.copy(alpha = 0.25f) else Color(0xFF0F1524),
-                            border = BorderStroke(1.dp, if (isSelected) color else Color(0x33FFFFFF)),
+                            shape = CyberShapes.chip,
+                            color = if (isSelected) color.copy(alpha = 0.24f) else c.panelRaised,
+                            border = BorderStroke(1.dp, if (isSelected) color else c.goldAntique.copy(alpha = 0.25f)),
+                            onClick = {
+                                CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
+                                viewModel.setCardSkin(selectedCardIndex, skinKey)
+                            },
                             modifier = Modifier
                                 .weight(1f)
-                                .clickable {
-                                    CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
-                                    viewModel.setCardSkin(selectedCardIndex, skinKey)
-                                }
+                                .heightIn(min = 48.dp)
                         ) {
-                            Text(
-                                text = label,
-                                fontSize = 10.sp,
-                                textAlign = TextAlign.Center,
-                                color = if (isSelected) color else Color.Gray,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                modifier = Modifier.padding(vertical = 4.dp),
-                                fontFamily = FontFamily.Monospace
-                            )
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = Space.xs)) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    textAlign = TextAlign.Center,
+                                    color = if (isSelected) color else c.textMid,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Feedback alert banner if any
         upgradeFeedbackMessage?.let { msg ->
             Text(
                 text = msg,
-                color = Color(0xFF00FF66),
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.labelMedium,
+                color = c.emeraldGlow,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 2.dp)
+                    .padding(vertical = Space.xxs)
             )
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(Space.xs))
 
-        // Search & Filter Arcana to Upgrade
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(Space.xs),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                label = { Text(if (lang == "ru") "Выбор аркана в кузницу..." else "Filter arcana...", fontSize = 11.sp) },
+                label = { Text(if (lang == "ru") "Выбор аркана..." else "Filter arcana...", style = MaterialTheme.typography.labelMedium) },
                 singleLine = true,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(50.dp),
+                modifier = Modifier.weight(1f),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFFFD700),
-                    unfocusedBorderColor = Color.DarkGray
+                    focusedBorderColor = c.goldLeaf,
+                    unfocusedBorderColor = c.goldAntique.copy(alpha = 0.4f)
                 )
             )
 
-            // Element Filters
             ElementAffinity.values().forEach { elem ->
                 val isSelected = selectedElementFilter == elem
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
-                        .background(if (isSelected) elem.color.copy(alpha = 0.3f) else Color(0xFF0E1322))
-                        .border(1.dp, if (isSelected) elem.color else Color(0x33FFFFFF), CircleShape)
+                        .background(if (isSelected) elem.color.copy(alpha = 0.3f) else c.panelRaised)
+                        .border(1.dp, if (isSelected) elem.color else c.goldAntique.copy(alpha = 0.3f), CircleShape)
                         .clickable {
                             CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
                             selectedElementFilter = if (isSelected) null else elem
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = elem.symbol, fontSize = 14.sp)
+                    Text(text = elem.symbol, style = MaterialTheme.typography.titleSmall)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(Space.xs))
 
-        // List of 78 Cards for Selection
         val cardsList = remember(searchQuery, selectedElementFilter) {
             CyberTarotDeck.cards.filter { card ->
                 val elem = when (card.index % 4) {
@@ -575,7 +570,7 @@ fun CardForgeScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(Space.xs)
         ) {
             items(cardsList) { card ->
                 val isSelected = card.index == selectedCardIndex
@@ -588,73 +583,76 @@ fun CardForgeScreen(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = if (isSelected) Color(0xFF161F38) else Color(0xFF0B101E),
-                    border = BorderStroke(1.dp, if (isSelected) Color(0xFFFFD700) else Color(0x1FFFFFFF)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelectCard(card.index) }
+                    shape = CyberShapes.chip,
+                    color = if (isSelected) c.panelRaised else c.panel,
+                    border = BorderStroke(1.dp, if (isSelected) c.goldLeaf else c.goldAntique.copy(alpha = 0.25f)),
+                    onClick = { onSelectCard(card.index) },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp),
+                            .padding(Space.sm),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = elem.symbol, fontSize = 16.sp)
+                            Text(text = elem.symbol, style = MaterialTheme.typography.titleMedium)
                             Column {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(Space.xs)
                                 ) {
                                     Text(
                                         text = card.name,
-                                        color = if (isSelected) Color(0xFFFFD700) else Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        fontFamily = FontFamily.Monospace
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = if (isSelected) c.goldLeaf else c.textHigh,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     if (up != null && up.upgradeLevel > 1) {
                                         Text(
-                                            text = "LVL ${up.upgradeLevel}",
-                                            color = Color(0xFFFFD700),
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold
+                                            text = "L${up.upgradeLevel}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = c.goldLeaf
                                         )
                                     }
                                 }
                                 Text(
                                     text = "${card.traditionalName} • ${card.defaultRarity}",
-                                    color = Color.Gray,
-                                    fontSize = 10.sp
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = c.textMid,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
 
-                        // Bonus indicators
                         if (up != null && (up.bonusPower > 0 || up.bonusDefense > 0 || up.energyDiscount > 0)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                                 if (up.bonusPower > 0) {
-                                    Text(text = "+${up.bonusPower}⚔", fontSize = 10.sp, color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
+                                    Text(text = "+${up.bonusPower}A", style = MaterialTheme.typography.labelSmall, color = c.danger)
                                 }
                                 if (up.bonusDefense > 0) {
-                                    Text(text = "+${up.bonusDefense}🛡", fontSize = 10.sp, color = Color(0xFF00FF66), fontWeight = FontWeight.Bold)
+                                    Text(text = "+${up.bonusDefense}D", style = MaterialTheme.typography.labelSmall, color = c.emeraldGlow)
                                 }
                                 if (up.energyDiscount > 0) {
-                                    Text(text = "-1⚡", fontSize = 10.sp, color = Color(0xFFFFB800), fontWeight = FontWeight.Bold)
+                                    Text(text = "-1R", style = MaterialTheme.typography.labelSmall, color = NeonAmber)
                                 }
                             }
                         } else {
                             Text(
-                                text = if (isSelected) "ВЫБРАН" else "ВЫБРАТЬ",
-                                fontSize = 10.sp,
-                                color = if (isSelected) Color(0xFFFFD700) else Color.DarkGray,
-                                fontFamily = FontFamily.Monospace
+                                text = if (isSelected) {
+                                    if (lang == "ru") "ВЫБРАН" else "ACTIVE"
+                                } else {
+                                    if (lang == "ru") "ВЫБРАТЬ" else "SELECT"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isSelected) c.goldLeaf else c.textMid
                             )
                         }
                     }

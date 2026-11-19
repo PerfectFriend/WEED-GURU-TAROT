@@ -4,43 +4,88 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.audio.CyberNoirSynthPlayer
+import com.example.data.Bip39Helper
+import com.example.data.Bip39Wordlist
 import com.example.data.LocalizationHelper
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.NeonGreen
-import com.example.ui.theme.NeonRed
-import com.example.ui.theme.RajdhaniFontFamily
+import com.example.ui.components.CyberActionButton
+import com.example.ui.components.CyberChip
+import com.example.ui.components.CyberPanel
+import com.example.ui.theme.Cyber
+import com.example.ui.theme.CyberShapes
+import com.example.ui.theme.IbmPlexMonoFontFamily
+import com.example.ui.theme.Space
 import com.example.viewmodel.TarotViewModel
 
 @Composable
 fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
+    val c = Cyber.colors
     val currentSkin by viewModel.currentSkin.collectAsStateWithLifecycle()
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
-    var currentStep by remember { mutableStateOf(0) } // 0: Lang & Security Notice, 1: Mnemonic Seed, 2: Seed Verification, 3: Alias/Avatar, 4: Container/P2P, 5: PIN setup
+    var currentStep by remember { mutableStateOf(0) }
     var isRestoreMode by remember { mutableStateOf(false) }
     var restoreSeedInput by remember { mutableStateOf("") }
     var restorePinInput by remember { mutableStateOf("") }
@@ -51,23 +96,19 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
     val selectedAvatarIdx = remember { mutableStateOf(0) }
     val allocatedStorageGb = remember { mutableStateOf(16f) }
 
-    // Generate real cryptographically secure random BIP39 phrase once
     val generatedMnemonicList = remember {
-        com.example.data.Bip39Helper.generateMnemonic(
-            com.example.data.Bip39Helper.generateRandomEntropy(256)
-        )
+        Bip39Helper.generateMnemonic(Bip39Helper.generateRandomEntropy(256))
     }
 
-    // Challenge verification states
-    val testIndices = remember {
-        (0..23).shuffled().take(3).sorted()
-    }
+    val testIndices = remember { (0..23).shuffled().take(3).sorted() }
     val verificationOptions = remember {
         testIndices.associateWith { correctIdx ->
             val correctWord = generatedMnemonicList[correctIdx]
             val others = (1..3).map {
-                var w = com.example.data.Bip39Wordlist.words.random()
-                while (w == correctWord) { w = com.example.data.Bip39Wordlist.words.random() }
+                var w = Bip39Wordlist.words.random()
+                while (w == correctWord) {
+                    w = Bip39Wordlist.words.random()
+                }
                 w
             }
             (others + correctWord).shuffled()
@@ -75,16 +116,14 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
     }
     val verificationAnswers = remember { mutableStateMapOf<Int, String>() }
 
-    // Keypad state for Master 8-digit PIN (no hardcoded safe/panic PINs)
     val masterPin = remember { mutableStateOf("") }
     var setupError by remember { mutableStateOf("") }
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val clipboardManager = LocalClipboardManager.current
     SecureScreenWindowEffect(enabled = !isRestoreMode && currentStep == 1)
 
-    // Set temporary language dynamically
     LaunchedEffect(tempLang.value) {
         viewModel.updateSystemLanguage(tempLang.value)
     }
@@ -95,26 +134,27 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF030308))
+                .background(c.ink)
                 .windowInsetsPadding(WindowInsets.systemBars)
-                .padding(16.dp),
+                .padding(Space.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = if (tempLang.value in listOf("ru", "uk")) "🔑 ВОССТАНОВЛЕНИЕ ИЗ СИД-ФРАЗЫ" else "🔑 BIP-39 SEED RESTORATION",
-                    fontFamily = RajdhaniFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = NeonCyan
+                    text = if (tempLang.value in listOf("ru", "uk")) "ВОССТАНОВЛЕНИЕ ИЗ СИД-ФРАЗЫ" else "BIP-39 SEED RESTORATION",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = c.accent
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(Space.xs))
                 Text(
-                    text = if (tempLang.value in listOf("ru", "uk")) "Введите 12 или 24 слова вашей мнемоники и задайте новый 8-значный ПИН для быстрого входа." else "Enter your 12 or 24-word seed phrase and set a new 8-digit PIN for quick access.",
-                    fontFamily = RajdhaniFontFamily,
-                    fontSize = 16.sp,
-                    color = Color(0xFFB0B0C5),
+                    text = if (tempLang.value in listOf("ru", "uk")) {
+                        "Введите 12 или 24 слова вашей мнемоники и задайте новый 8-значный ПИН для быстрого входа."
+                    } else {
+                        "Enter your 12 or 24-word seed phrase and set a new 8-digit PIN for quick access."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = c.textMid,
                     textAlign = TextAlign.Center
                 )
             }
@@ -124,7 +164,7 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(Space.md),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 OutlinedTextField(
@@ -135,19 +175,16 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                     },
                     placeholder = {
                         Text(
-                            if (tempLang.value in listOf("ru", "uk")) "Вставьте или введите 12/24 слов через пробел..." else "Paste or type 12/24 words separated by spaces...",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 16.sp,
-                            color = Color(0xFFB0B0C5)
+                            if (tempLang.value in listOf("ru", "uk")) "Вставьте или введите 12/24 слов через пробел..." else "Paste or type 12/24 words separated by spaces..."
                         )
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(100.dp),
-                    textStyle = TextStyle(fontFamily = RajdhaniFontFamily, fontSize = 16.sp, color = Color.White),
+                        .heightIn(min = 100.dp),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.textHigh),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = NeonCyan,
-                        unfocusedBorderColor = Color(0x33FFFFFF)
+                        focusedBorderColor = c.accent,
+                        unfocusedBorderColor = c.goldAntique.copy(alpha = 0.35f)
                     )
                 )
 
@@ -159,9 +196,8 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                     val wordCount = restoreSeedInput.trim().split(Regex("\\s+")).filter { it.isNotBlank() }.size
                     Text(
                         text = if (tempLang.value in listOf("ru", "uk")) "Слов: $wordCount / 24" else "Words: $wordCount / 24",
-                        fontFamily = RajdhaniFontFamily,
-                        fontSize = 16.sp,
-                        color = if (wordCount == 12 || wordCount == 24) NeonGreen else Color.LightGray
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (wordCount == 12 || wordCount == 24) c.emeraldGlow else c.textHigh
                     )
                     TextButton(
                         onClick = {
@@ -169,29 +205,33 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                             if (clip.isNotBlank()) {
                                 restoreSeedInput = clip.trim()
                             }
-                        }
+                        },
+                        modifier = Modifier.heightIn(min = 48.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentPaste,
+                            contentDescription = null,
+                            tint = c.accent,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(Space.xs))
                         Text(
-                            text = if (tempLang.value in listOf("ru", "uk")) "📋 ВСТАВИТЬ" else "📋 PASTE",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 16.sp,
-                            color = NeonCyan,
-                            fontWeight = FontWeight.Bold
+                            text = if (tempLang.value in listOf("ru", "uk")) "ВСТАВИТЬ" else "PASTE",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = c.accent
                         )
                     }
                 }
 
                 Text(
-                    text = if (tempLang.value in listOf("ru", "uk")) "🔢 ЗАДАЙТЕ 8-ЗНАЧНЫЙ ПИН-КОД ДЛЯ ВХОДА" else "🔢 CONFIGURE 8-DIGIT ENTRY PIN",
-                    fontFamily = RajdhaniFontFamily,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    text = if (tempLang.value in listOf("ru", "uk")) "ЗАДАЙТЕ 8-ЗНАЧНЫЙ ПИН-КОД ДЛЯ ВХОДА" else "CONFIGURE 8-DIGIT ENTRY PIN",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = c.textHigh
                 )
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Space.md),
+                    modifier = Modifier.padding(vertical = Space.xs)
                 ) {
                     for (i in 0 until 8) {
                         val filled = restorePinInput.length > i
@@ -199,8 +239,8 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                             modifier = Modifier
                                 .size(16.dp)
                                 .clip(CircleShape)
-                                .background(if (filled) NeonCyan else Color(0x22FFFFFF))
-                                .border(1.5.dp, if (filled) NeonCyan else Color(0xFFB0B0C5), CircleShape)
+                                .background(if (filled) c.accent else c.panelRaised)
+                                .border(1.5.dp, if (filled) c.accent else c.textMid, CircleShape)
                         )
                     }
                 }
@@ -208,10 +248,9 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                 if (restoreError.isNotBlank()) {
                     Text(
                         text = restoreError,
-                        fontFamily = RajdhaniFontFamily,
-                        fontSize = 16.sp,
-                        color = NeonRed,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = c.danger
                     )
                 }
 
@@ -228,9 +267,7 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                             restorePinInput = restorePinInput.dropLast(1)
                         }
                     },
-                    onClearClick = {
-                        restorePinInput = ""
-                    },
+                    onClearClick = { restorePinInput = "" },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -238,35 +275,37 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(top = Space.sm),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                CyberButton(
+                CyberActionButton(
+                    text = if (tempLang.value in listOf("ru", "uk")) "НАЗАД" else "BACK",
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
                     onClick = { isRestoreMode = false },
-                    skin = currentSkin,
-                    modifier = Modifier
-                        .width(120.dp)
-                        .height(44.dp)
-                ) {
-                    Text(
-                        text = if (tempLang.value in listOf("ru", "uk")) "⬅️ НАЗАД" else "⬅️ BACK",
-                        fontFamily = RajdhaniFontFamily,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                    secondary = true
+                )
 
                 val wordsList = restoreSeedInput.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
                 val isRestoreValid = (wordsList.size == 12 || wordsList.size == 24) && restorePinInput.length == 8
 
-                CyberButton(
+                CyberActionButton(
+                    text = if (tempLang.value in listOf("ru", "uk")) "ВОССТАНОВИТЬ" else "RESTORE",
+                    icon = Icons.Default.LockOpen,
+                    enabled = isRestoreValid,
                     onClick = {
-                        if (!com.example.data.Bip39Helper.validateWords(wordsList)) {
-                            restoreError = if (tempLang.value in listOf("ru", "uk")) "❌ Некорректные слова мнемоники BIP-39" else "❌ Invalid BIP-39 mnemonic words"
+                        if (!Bip39Helper.validateWords(wordsList)) {
+                            restoreError = if (tempLang.value in listOf("ru", "uk")) {
+                                "Некорректные слова мнемоники BIP-39"
+                            } else {
+                                "Invalid BIP-39 mnemonic words"
+                            }
                         } else if (restorePinInput.length != 8) {
-                            restoreError = if (tempLang.value in listOf("ru", "uk")) "❌ ПИН должен содержать ровно 8 цифр" else "❌ PIN must be exactly 8 digits"
+                            restoreError = if (tempLang.value in listOf("ru", "uk")) {
+                                "ПИН должен содержать ровно 8 цифр"
+                            } else {
+                                "PIN must be exactly 8 digits"
+                            }
                         } else {
                             viewModel.saveSecuredProfileWithPin(
                                 dob = "",
@@ -279,25 +318,12 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                                 avatarIdx = 0,
                                 customWords = wordsList
                             )
-                            com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.SUCCESS_CHIME)
+                            CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.SUCCESS_CHIME)
                             onComplete()
                         }
                     },
-                    skin = currentSkin,
-                    modifier = Modifier
-                        .width(160.dp)
-                        .height(44.dp)
-                        .graphicsLayer { alpha = if (isRestoreValid) 1f else 0.4f },
-                    enabled = isRestoreValid
-                ) {
-                    Text(
-                        text = if (tempLang.value in listOf("ru", "uk")) "ВОССТАНОВИТЬ 🔓" else "RESTORE 🔓",
-                        fontFamily = RajdhaniFontFamily,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                    modifier = Modifier.graphicsLayer { alpha = if (isRestoreValid) 1f else 0.45f }
+                )
             }
         }
         return
@@ -306,51 +332,48 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF030308))
+            .background(c.ink)
             .windowInsetsPadding(WindowInsets.systemBars)
-            .padding(16.dp),
+            .padding(Space.lg),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = Space.sm),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "STEP ${currentStep + 1} OF 6",
-                    fontFamily = RajdhaniFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontFamily = IbmPlexMonoFontFamily,
                     color = currentSkin.primaryColor
                 )
                 Text(
                     text = when (currentStep) {
-                        0 -> "🌐 LANGUAGE & RESPONSIBILITY"
-                        1 -> "🌱 SEED MEMORY CORE"
-                        2 -> "🧠 NEURAL CHALLENGE"
-                        3 -> "👤 LOCAL GROWER IDENT"
-                        4 -> "📦 DECENTRALIZED CONTAINERS"
-                        else -> "🔢 SECURITY INTERLOCK"
+                        0 -> "LANGUAGE & RESPONSIBILITY"
+                        1 -> "SEED MEMORY CORE"
+                        2 -> "NEURAL CHALLENGE"
+                        3 -> "LOCAL GROWER IDENT"
+                        4 -> "DECENTRALIZED CONTAINERS"
+                        else -> "SECURITY INTERLOCK"
                     },
-                    fontFamily = RajdhaniFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = Color(0xFFB0B0C5)
+                    style = MaterialTheme.typography.labelLarge,
+                    color = c.textMid
                 )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(Space.xs)
             ) {
                 for (i in 0 until 6) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(if (currentStep >= i) currentSkin.primaryColor else Color(0x33FFFFFF))
+                            .clip(CyberShapes.chip)
+                            .background(if (currentStep >= i) currentSkin.primaryColor else c.panelRaised)
                     )
                 }
             }
@@ -360,164 +383,123 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(vertical = 16.dp),
+                .padding(vertical = Space.lg),
             contentAlignment = Alignment.Center
         ) {
             when (currentStep) {
                 0 -> {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(Space.md),
                         modifier = Modifier.verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = "🌐 LOCALIZATION DISCOVERY SCAN",
-                            fontFamily = RajdhaniFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = Color.White
+                            text = "LOCALIZATION DISCOVERY SCAN",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = c.textHigh
                         )
                         Box(
                             modifier = Modifier
-                                .size(80.dp)
+                                .size(76.dp)
                                 .clip(CircleShape)
-                                .background(currentSkin.primaryColor.copy(alpha = 0.05f))
-                                .border(1.5.dp, currentSkin.primaryColor.copy(alpha = 0.4f), CircleShape),
+                                .background(currentSkin.primaryColor.copy(alpha = 0.08f))
+                                .border(1.5.dp, currentSkin.primaryColor.copy(alpha = 0.45f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Language,
-                                contentDescription = "Lang",
+                                contentDescription = "Language",
                                 tint = currentSkin.primaryColor,
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(34.dp)
                             )
                         }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
                             LocalizationHelper.languages.chunked(2).forEach { pair ->
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(Space.sm),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     pair.forEach { (code, name) ->
-                                        val isSelected = tempLang.value == code
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(44.dp)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(if (isSelected) currentSkin.primaryColor.copy(alpha = 0.15f) else Color(0xFF161622))
-                                                .border(1.5.dp, if (isSelected) currentSkin.primaryColor else Color(0x1AFFFFFF), RoundedCornerShape(10.dp))
-                                                .clickable {
-                                                    com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CLICK)
-                                                    tempLang.value = code
-                                                }
-                                                .padding(horizontal = 12.dp),
-                                            contentAlignment = Alignment.CenterStart
-                                        ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(8.dp)
-                                                        .clip(CircleShape)
-                                                        .background(if (isSelected) currentSkin.primaryColor else Color(0xFFB0B0C5))
-                                                )
-                                                Text(
-                                                    text = name,
-                                                    fontFamily = RajdhaniFontFamily,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isSelected) Color.White else Color.LightGray
-                                                )
-                                            }
-                                        }
+                                        CyberChip(
+                                            label = name,
+                                            selected = tempLang.value == code,
+                                            onClick = {
+                                                CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
+                                                tempLang.value = code
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        )
                                     }
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1111)),
-                            border = BorderStroke(1.5.dp, NeonRed.copy(alpha = 0.6f)),
-                            shape = RoundedCornerShape(12.dp),
+                        CyberPanel(
+                            borderColor = c.danger.copy(alpha = 0.65f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Warning,
-                                        contentDescription = "Warning",
-                                        tint = NeonRed,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Text(
-                                        text = if (tempLang.value == "ru") "⚠️ ВАЖНОЕ ПРЕДУПРЕЖДЕНИЕ БЕЗОПАСНОСТИ" else "⚠️ CRITICAL SECURITY WARNING",
-                                        fontFamily = RajdhaniFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp,
-                                        color = NeonRed
-                                    )
-                                }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Warning",
+                                    tint = c.danger,
+                                    modifier = Modifier.size(20.dp)
+                                )
                                 Text(
-                                    text = if (tempLang.value == "ru") {
-                                        "Это полностью децентрализованное приложение с некастодиальным кошельком. Здесь НЕТ центрального сервера, службы поддержки клиентов или механизма восстановления паролей.\n\n" +
-                                        "• Только ВЫ отвечаете за сохранность вашей сид-фразы и ПИН-кодов.\n" +
-                                        "• Если вы потеряете сид-фразу, никто и никогда не сможет восстановить ваш кошелек или ваши токены WEED.\n" +
-                                        "• При утере данных они исчезнут навсегда."
-                                    } else {
-                                        "This is a fully decentralized, self-custodial neural application. There is NO central server, no customer support, and no password reset.\n\n" +
-                                        "• ONLY YOU are responsible for saving your security credentials and PINs.\n" +
-                                        "• If you lose your seed phrase, NO ONE can recover your wallet or access your WEED assets.\n" +
-                                        "• All lost data is gone forever."
-                                    },
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontSize = 16.sp,
-                                    color = Color.LightGray,
-                                    lineHeight = 15.sp
+                                    text = if (tempLang.value == "ru") "ВАЖНОЕ ПРЕДУПРЕЖДЕНИЕ БЕЗОПАСНОСТИ" else "CRITICAL SECURITY WARNING",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = c.danger
                                 )
                             }
+                            Spacer(modifier = Modifier.height(Space.sm))
+                            Text(
+                                text = if (tempLang.value == "ru") {
+                                    "Это децентрализованное приложение с некастодиальным кошельком. Здесь НЕТ центрального сервера и службы восстановления паролей.\n\n" +
+                                        "• Только ВЫ отвечаете за сохранность сид-фразы и ПИН-кодов.\n" +
+                                        "• При утере сид-фразы никто не сможет восстановить доступ к активам."
+                                } else {
+                                    "This is a decentralized, self-custodial neural application. There is NO central server or password reset.\n\n" +
+                                        "• ONLY YOU are responsible for saving your seed phrase and PIN.\n" +
+                                        "• If you lose your seed phrase, assets cannot be recovered."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = c.textMid
+                            )
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF0C1425),
-                            border = BorderStroke(1.5.dp, NeonCyan.copy(alpha = 0.7f)),
+                            onClick = {
+                                CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
+                                isRestoreMode = true
+                            },
+                            shape = CyberShapes.control,
+                            color = c.panelRaised,
+                            border = BorderStroke(1.5.dp, c.accent.copy(alpha = 0.7f)),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CLICK)
-                                    isRestoreMode = true
-                                }
+                                .heightIn(min = 48.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(12.dp),
+                                modifier = Modifier.padding(Space.md),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Key,
                                     contentDescription = "Restore",
-                                    tint = NeonCyan,
+                                    tint = c.accent,
                                     modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(Space.sm))
                                 Text(
-                                    text = if (tempLang.value in listOf("ru", "uk")) "🔑 У МЕНЯ ЕСТЬ СИД • ВОССТАНОВИТЬ" else "🔑 HAVE A SEED PHRASE? RESTORE",
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = NeonCyan
+                                    text = if (tempLang.value in listOf("ru", "uk")) "У МЕНЯ ЕСТЬ СИД • ВОССТАНОВИТЬ" else "HAVE A SEED PHRASE? RESTORE",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = c.accent
                                 )
                             }
                         }
@@ -526,101 +508,101 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                 1 -> {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(Space.md),
                         modifier = Modifier.verticalScroll(rememberScrollState())
                     ) {
                         Text(
                             text = t("bip39_header"),
-                            fontFamily = RajdhaniFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color.White
+                            style = MaterialTheme.typography.titleMedium,
+                            color = c.textHigh
                         )
                         Text(
-                            text = if (tempLang.value == "ru") "Запишите эту мнемоническую фразу из 24 слов на бумагу и сохраните в надежном месте." else "Please write down this 24-word mnemonic seed phrase on paper and save it securely.",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 16.sp,
-                            color = Color(0xFFB0B0C5),
+                            text = if (tempLang.value == "ru") {
+                                "Запишите эту мнемоническую фразу из 24 слов на бумагу и сохраните в надёжном месте."
+                            } else {
+                                "Write down this 24-word mnemonic seed phrase on paper and save it securely."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMid,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 16.dp)
+                            modifier = Modifier.padding(horizontal = Space.md)
                         )
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF11111E)),
-                            border = BorderStroke(1.5.dp, currentSkin.primaryColor.copy(alpha = 0.5f)),
-                            shape = RoundedCornerShape(12.dp),
+                        CyberPanel(
+                            borderColor = currentSkin.primaryColor.copy(alpha = 0.5f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text(
-                                    text = "⚠️ " + t("seed_warning"),
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NeonRed,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                HorizontalDivider(color = Color(0x22FFFFFF), thickness = 1.dp)
+                            Text(
+                                text = t("seed_warning"),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = c.danger,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(Space.sm))
+                            HorizontalDivider(color = c.goldAntique.copy(alpha = 0.25f))
+                            Spacer(modifier = Modifier.height(Space.sm))
 
-                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    generatedMnemonicList.chunked(3).forEach { chunk ->
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            chunk.forEach { word ->
-                                                val idx = generatedMnemonicList.indexOf(word) + 1
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .height(34.dp)
-                                                        .clip(RoundedCornerShape(6.dp))
-                                                        .background(Color(0xFF1B1B2B))
-                                                        .padding(horizontal = 8.dp),
-                                                    contentAlignment = Alignment.CenterStart
-                                                ) {
-                                                    Text(
-                                                        text = "$idx. $word",
-                                                        fontFamily = RajdhaniFontFamily,
-                                                        fontSize = 16.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Color.White
-                                                    )
-                                                }
+                            Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                                generatedMnemonicList.chunked(3).forEachIndexed { rowIdx, chunk ->
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(Space.xs),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        chunk.forEachIndexed { colIdx, word ->
+                                            val idx = rowIdx * 3 + colIdx + 1
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(CyberShapes.chip)
+                                                    .background(c.panelRaised)
+                                                    .padding(horizontal = Space.sm, vertical = Space.sm),
+                                                contentAlignment = Alignment.CenterStart
+                                            ) {
+                                                Text(
+                                                    text = "$idx. $word",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontFamily = IbmPlexMonoFontFamily,
+                                                    color = c.textHigh,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
                                             }
                                         }
                                     }
                                 }
+                            }
 
-                                Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(Space.md))
 
-                                Button(
-                                    onClick = {
-                                        com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.SUCCESS_CHIME)
-                                        copySensitiveTextWithAutoClear(
-                                            context = context,
-                                            scope = coroutineScope,
-                                            label = "BIP39 Seed",
-                                            secretText = generatedMnemonicList.joinToString(" ")
-                                        )
-                                        viewModel.postNotification("📋 Seed copied to sensitive clipboard (auto-clears in 45s)")
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = currentSkin.primaryColor.copy(alpha = 0.2f)),
-                                    border = BorderStroke(1.dp, currentSkin.primaryColor),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.fillMaxWidth().height(44.dp)
-                                ) {
-                                    Text(
-                                        text = t("btn_copy"),
-                                        fontFamily = RajdhaniFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 17.sp,
-                                        color = Color.White
+                            Button(
+                                onClick = {
+                                    CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.SUCCESS_CHIME)
+                                    copySensitiveTextWithAutoClear(
+                                        context = context,
+                                        scope = coroutineScope,
+                                        label = "BIP39 Seed",
+                                        secretText = generatedMnemonicList.joinToString(" ")
                                     )
-                                }
+                                    viewModel.postNotification("Seed copied to sensitive clipboard (auto-clears in 45s)")
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = currentSkin.primaryColor.copy(alpha = 0.22f)),
+                                border = BorderStroke(1.dp, currentSkin.primaryColor),
+                                shape = CyberShapes.control,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = null,
+                                    tint = c.textHigh,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(Space.sm))
+                                Text(
+                                    text = t("btn_copy"),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = c.textHigh
+                                )
                             }
                         }
                     }
@@ -628,26 +610,25 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                 2 -> {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(Space.md),
                         modifier = Modifier.verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = if (tempLang.value == "ru") "🧠 ПРОВЕРКА СИД-ФРАЗЫ" else "🧠 NEURAL SEED VERIFICATION",
-                            fontFamily = RajdhaniFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color.White
+                            text = if (tempLang.value == "ru") "ПРОВЕРКА СИД-ФРАЗЫ" else "NEURAL SEED VERIFICATION",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = c.textHigh
                         )
                         Text(
-                            text = if (tempLang.value == "ru") "Выберите правильные слова для проверки, что вы действительно сохранили мнемонику." else "Select the correct words to verify you have securely saved your seed phrase.",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 16.sp,
-                            color = Color(0xFFB0B0C5),
+                            text = if (tempLang.value == "ru") {
+                                "Выберите правильные слова для подтверждения резервной копии."
+                            } else {
+                                "Select the correct words to verify your seed backup."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMid,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 16.dp)
+                            modifier = Modifier.padding(horizontal = Space.md)
                         )
-
-                        Spacer(modifier = Modifier.height(4.dp))
 
                         testIndices.forEach { testIdx ->
                             val correctWord = generatedMnemonicList[testIdx]
@@ -655,78 +636,69 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                             val selected = verificationAnswers[testIdx]
 
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0F1A)),
-                                border = BorderStroke(1.dp, if (selected == correctWord) NeonGreen.copy(alpha = 0.4f) else if (selected != null) NeonRed.copy(alpha = 0.4f) else Color.DarkGray),
-                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(containerColor = c.panel),
+                                border = BorderStroke(
+                                    1.dp,
+                                    when (selected) {
+                                        correctWord -> c.emeraldGlow.copy(alpha = 0.55f)
+                                        null -> c.goldAntique.copy(alpha = 0.35f)
+                                        else -> c.danger.copy(alpha = 0.55f)
+                                    }
+                                ),
+                                shape = CyberShapes.cardCompact,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Column(
+                                    modifier = Modifier.padding(Space.md),
+                                    verticalArrangement = Arrangement.spacedBy(Space.sm)
+                                ) {
                                     Text(
-                                        text = if (tempLang.value == "ru") "Какое слово идет под номером #${testIdx + 1}?" else "Identify Word #${testIdx + 1}:",
-                                        fontFamily = RajdhaniFontFamily,
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        text = if (tempLang.value == "ru") "Какое слово идёт под номером #${testIdx + 1}?" else "Identify Word #${testIdx + 1}:",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = c.textHigh
                                     )
 
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        options.take(2).forEach { option ->
-                                            val isChosen = selected == option
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .height(38.dp)
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(if (isChosen) (if (option == correctWord) NeonGreen.copy(alpha = 0.2f) else NeonRed.copy(alpha = 0.2f)) else Color(0xFF1B1B2B))
-                                                    .border(1.dp, if (isChosen) (if (option == correctWord) NeonGreen else NeonRed) else Color.Transparent, RoundedCornerShape(6.dp))
-                                                    .clickable {
-                                                        com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CLICK)
-                                                        verificationAnswers[testIdx] = option
-                                                    }
-                                                    .padding(horizontal = 8.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = option,
-                                                    fontFamily = RajdhaniFontFamily,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        options.drop(2).take(2).forEach { option ->
-                                            val isChosen = selected == option
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .height(38.dp)
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(if (isChosen) (if (option == correctWord) NeonGreen.copy(alpha = 0.2f) else NeonRed.copy(alpha = 0.2f)) else Color(0xFF1B1B2B))
-                                                    .border(1.dp, if (isChosen) (if (option == correctWord) NeonGreen else NeonRed) else Color.Transparent, RoundedCornerShape(6.dp))
-                                                    .clickable {
-                                                        com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CLICK)
-                                                        verificationAnswers[testIdx] = option
-                                                    }
-                                                    .padding(horizontal = 8.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = option,
-                                                    fontFamily = RajdhaniFontFamily,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White
-                                                )
+                                    options.chunked(2).forEach { pair ->
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            pair.forEach { option ->
+                                                val isChosen = selected == option
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .heightIn(min = 48.dp)
+                                                        .clip(CyberShapes.chip)
+                                                        .background(
+                                                            if (isChosen) {
+                                                                if (option == correctWord) c.emeraldGlow.copy(alpha = 0.22f) else c.danger.copy(alpha = 0.22f)
+                                                            } else {
+                                                                c.panelRaised
+                                                            }
+                                                        )
+                                                        .border(
+                                                            1.dp,
+                                                            if (isChosen) {
+                                                                if (option == correctWord) c.emeraldGlow else c.danger
+                                                            } else {
+                                                                Color.Transparent
+                                                            },
+                                                            CyberShapes.chip
+                                                        )
+                                                        .clickable {
+                                                            CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
+                                                            verificationAnswers[testIdx] = option
+                                                        }
+                                                        .padding(horizontal = Space.sm),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = option,
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                        color = c.textHigh
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -746,82 +718,79 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                     )
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(Space.md),
                         modifier = Modifier.verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = "👤 CHOOSE LOCAL GROWER IDENTITY",
-                            fontFamily = RajdhaniFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color.White
+                            text = "CHOOSE LOCAL GROWER IDENTITY",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = c.textHigh
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
 
                         OutlinedTextField(
                             value = aliasInput.value,
                             onValueChange = { aliasInput.value = it },
-                            label = { Text("Local Alias (Username)", color = Color(0xFFB0B0C5), fontSize = 16.sp, fontFamily = RajdhaniFontFamily) },
+                            label = { Text("Local Alias (Username)") },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = currentSkin.primaryColor,
-                                unfocusedBorderColor = Color(0x33FFFFFF),
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
+                                unfocusedBorderColor = c.goldAntique.copy(alpha = 0.35f),
+                                focusedTextColor = c.textHigh,
+                                unfocusedTextColor = c.textHigh
                             ),
-                            textStyle = TextStyle(fontFamily = RajdhaniFontFamily, fontSize = 14.sp),
+                            textStyle = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.fillMaxWidth().testTag("onboarding_alias_input")
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
                             avatars.chunked(2).forEachIndexed { rowIdx, pair ->
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(Space.sm),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    pair.forEach { avName ->
-                                        val curIdx = rowIdx * 2 + pair.indexOf(avName)
+                                    pair.forEachIndexed { colIdx, avName ->
+                                        val curIdx = rowIdx * 2 + colIdx
                                         val isSelected = selectedAvatarIdx.value == curIdx
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .height(56.dp)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(if (isSelected) currentSkin.primaryColor.copy(alpha = 0.15f) else Color(0xFF13131F))
-                                                .border(1.5.dp, if (isSelected) currentSkin.primaryColor else Color(0x1AFFFFFF), RoundedCornerShape(10.dp))
+                                                .heightIn(min = 56.dp)
+                                                .clip(CyberShapes.control)
+                                                .background(if (isSelected) currentSkin.primaryColor.copy(alpha = 0.16f) else c.panelRaised)
+                                                .border(
+                                                    1.5.dp,
+                                                    if (isSelected) currentSkin.primaryColor else c.goldAntique.copy(alpha = 0.25f),
+                                                    CyberShapes.control
+                                                )
                                                 .clickable {
-                                                    com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CLICK)
+                                                    CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
                                                     selectedAvatarIdx.value = curIdx
                                                 }
-                                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                                .padding(horizontal = Space.md, vertical = Space.sm),
                                             contentAlignment = Alignment.CenterStart
                                         ) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                horizontalArrangement = Arrangement.spacedBy(Space.sm)
                                             ) {
                                                 Box(
                                                     modifier = Modifier
                                                         .size(28.dp)
                                                         .clip(CircleShape)
-                                                        .background(if (isSelected) currentSkin.primaryColor else Color(0xFFB0B0C5)),
+                                                        .background(if (isSelected) currentSkin.primaryColor else c.textMid),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Default.Face,
                                                         contentDescription = "Avatar",
-                                                        tint = Color.Black,
+                                                        tint = c.ink,
                                                         modifier = Modifier.size(16.dp)
                                                     )
                                                 }
                                                 Text(
                                                     text = avName,
-                                                    fontFamily = RajdhaniFontFamily,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isSelected) Color.White else Color.LightGray
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    color = if (isSelected) c.textHigh else c.textMid
                                                 )
                                             }
                                         }
@@ -835,141 +804,111 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                     val cloudEarned = allocatedStorageGb.value / 4f
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(Space.md),
                         modifier = Modifier.verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = "📦 DECENTRALIZED CRYPTO-CONTAINER",
-                            fontFamily = RajdhaniFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color.White
+                            text = "DECENTRALIZED CRYPTO-CONTAINER",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = c.textHigh
                         )
                         Text(
                             text = "Choose storage allocation for your local AES-256-GCM container and experimental LAN Swarm replication.",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 16.sp,
-                            color = Color(0xFFB0B0C5),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMid,
                             textAlign = TextAlign.Center
                         )
 
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF10101C)),
-                            border = BorderStroke(1.dp, Color(0x22FFFFFF)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                        CyberPanel(
+                            borderColor = c.goldAntique.copy(alpha = 0.35f),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "ALLOCATE STORAGE SPACE: ${allocatedStorageGb.value.toInt()} GB",
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = currentSkin.primaryColor
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Slider(
-                                    value = allocatedStorageGb.value,
-                                    onValueChange = {
-                                        val stepped = when {
-                                            it < 24 -> 16f
-                                            it < 48 -> 32f
-                                            it < 96 -> 64f
-                                            else -> 128f
-                                        }
-                                        allocatedStorageGb.value = stepped
-                                    },
-                                    valueRange = 16f..128f,
-                                    steps = 3,
-                                    colors = SliderDefaults.colors(
-                                        activeTrackColor = currentSkin.primaryColor,
-                                        thumbColor = currentSkin.primaryColor
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("P2P SHARED", fontSize = 15.sp, color = Color(0xFFB0B0C5), fontFamily = RajdhaniFontFamily)
-                                        Text("${allocatedStorageGb.value.toInt()} GB", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color.White, fontFamily = RajdhaniFontFamily)
+                            Text(
+                                text = "ALLOCATE STORAGE SPACE: ${allocatedStorageGb.value.toInt()} GB",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = currentSkin.primaryColor,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
+                            Spacer(modifier = Modifier.height(Space.xs))
+                            Slider(
+                                value = allocatedStorageGb.value,
+                                onValueChange = {
+                                    allocatedStorageGb.value = when {
+                                        it < 24 -> 16f
+                                        it < 48 -> 32f
+                                        it < 96 -> 64f
+                                        else -> 128f
                                     }
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("CLOUD BACKUP", fontSize = 15.sp, color = Color(0xFFB0B0C5), fontFamily = RajdhaniFontFamily)
-                                        Text("${cloudEarned.toInt()} GB", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = NeonGreen, fontFamily = RajdhaniFontFamily)
-                                    }
+                                },
+                                valueRange = 16f..128f,
+                                steps = 3,
+                                colors = SliderDefaults.colors(
+                                    activeTrackColor = currentSkin.primaryColor,
+                                    thumbColor = currentSkin.primaryColor
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Spacer(modifier = Modifier.height(Space.sm))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("P2P SHARED", style = MaterialTheme.typography.labelMedium, color = c.textMid)
+                                    Text("${allocatedStorageGb.value.toInt()} GB", style = MaterialTheme.typography.titleSmall, fontFamily = IbmPlexMonoFontFamily, color = c.textHigh)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("CLOUD BACKUP", style = MaterialTheme.typography.labelMedium, color = c.textMid)
+                                    Text("${cloudEarned.toInt()} GB", style = MaterialTheme.typography.titleSmall, fontFamily = IbmPlexMonoFontFamily, color = c.emeraldGlow)
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF121A16)),
-                            border = BorderStroke(1.dp, Color(0x3300FF00)),
-                            shape = RoundedCornerShape(10.dp),
+                        CyberPanel(
+                            borderColor = c.emeraldGlow.copy(alpha = 0.35f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(
-                                    text = "📖 DECENTRALIZED CRYPTO-CLOUD STUDY",
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = NeonGreen
-                                )
-                                Text(
-                                    text = "This application stores encrypted local archives inside an AES-256-GCM container and supports experimental LAN Swarm shard replication plus an offline Sandbox simulator. No centralized logging server exists.",
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontSize = 15.sp,
-                                    color = Color.LightGray
-                                )
-                                HorizontalDivider(color = Color(0x2200FF00), thickness = 1.dp)
-                                Text(
-                                    text = "• LOCAL ENCRYPTION: Container shards use AES-256-GCM with keys sealed by AndroidKeyStore + PBKDF2-HMAC-SHA256.\n" +
-                                           "• AUTHENTICATED LAN SWARM: TCP shard replication transfers only ciphertext frames with HMAC-SHA256 peer auth and SHA-256 integrity digests.\n" +
-                                           "• HONEST SANDBOX: Simulated P2P transfers and on-chain previews are labeled [SANDBOX] without fake mainnet broadcasts.\n" +
-                                           "• CONTROL: You can deallocate containers, reset credentials, or trigger an explicit wipe inside Settings anytime.",
-                                    fontFamily = RajdhaniFontFamily,
-                                    fontSize = 14.sp,
-                                    color = Color(0xFFB0B0C5)
-                                )
-                            }
+                            Text(
+                                text = "DECENTRALIZED CRYPTO-CLOUD NOTES",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = c.emeraldGlow
+                            )
+                            Spacer(modifier = Modifier.height(Space.xs))
+                            Text(
+                                text = "• LOCAL ENCRYPTION: Container shards use AES-256-GCM with keys sealed by AndroidKeyStore + PBKDF2-HMAC-SHA256.\n" +
+                                    "• AUTHENTICATED LAN SWARM: TCP shard replication uses HMAC-SHA256 peer auth and SHA-256 digests.\n" +
+                                    "• HONEST SANDBOX: Simulated P2P transfers are labeled [SANDBOX] without fake broadcasts.\n" +
+                                    "• CONTROL: You can wipe containers or reset credentials inside Settings anytime.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = c.textMid
+                            )
                         }
                     }
                 }
                 else -> {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(Space.sm),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "🔢 MASTER ENTRY PIN",
-                            fontFamily = RajdhaniFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
+                            text = "MASTER ENTRY PIN",
+                            style = MaterialTheme.typography.titleMedium,
                             color = currentSkin.primaryColor
                         )
-
                         Text(
                             text = "Set up your 8-digit PIN code to lock, verify, and authorize fast entry into the app.",
-                            fontFamily = RajdhaniFontFamily,
-                            fontSize = 16.sp,
-                            color = Color(0xFFB0B0C5),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMid,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 12.dp)
+                            modifier = Modifier.padding(horizontal = Space.md)
                         )
 
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.padding(vertical = 10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(Space.md),
+                            modifier = Modifier.padding(vertical = Space.sm)
                         ) {
                             for (i in 0 until 8) {
                                 val filled = masterPin.value.length > i
@@ -977,8 +916,8 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                                     modifier = Modifier
                                         .size(16.dp)
                                         .clip(CircleShape)
-                                        .background(if (filled) currentSkin.primaryColor else Color(0x22FFFFFF))
-                                        .border(1.5.dp, if (filled) currentSkin.primaryColor else Color(0xFFB0B0C5), CircleShape)
+                                        .background(if (filled) currentSkin.primaryColor else c.panelRaised)
+                                        .border(1.5.dp, if (filled) currentSkin.primaryColor else c.textMid, CircleShape)
                                 )
                             }
                         }
@@ -986,10 +925,9 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                         if (setupError.isNotBlank()) {
                             Text(
                                 text = setupError,
-                                fontFamily = RajdhaniFontFamily,
-                                fontSize = 16.sp,
-                                color = NeonRed,
-                                fontWeight = FontWeight.Bold
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = c.danger
                             )
                         }
 
@@ -1006,9 +944,7 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                                     masterPin.value = masterPin.value.dropLast(1)
                                 }
                             },
-                            onClearClick = {
-                                masterPin.value = ""
-                            },
+                            onClearClick = { masterPin.value = "" },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -1022,43 +958,35 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (currentStep > 0) {
-                CyberButton(
+                CyberActionButton(
+                    text = "BACK",
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    secondary = true,
                     onClick = {
-                        com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.CLICK)
+                        CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
                         currentStep -= 1
-                    },
-                    skin = currentSkin,
-                    modifier = Modifier.width(110.dp).height(44.dp)
-                ) {
-                    Text(
-                        text = "⬅️ BACK",
-                        fontFamily = RajdhaniFontFamily,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                    }
+                )
             } else {
                 Spacer(modifier = Modifier.width(110.dp))
             }
 
-            val nextText = if (currentStep == 5 && masterPin.value.length == 8) "ACTIVATE 🔒" else "NEXT ➡️"
+            val nextText = if (currentStep == 5 && masterPin.value.length == 8) "ACTIVATE" else "NEXT"
             val isNextEnabled = when (currentStep) {
                 1 -> true
-                2 -> {
-                    testIndices.all { idx ->
-                        verificationAnswers[idx] == generatedMnemonicList[idx]
-                    }
-                }
+                2 -> testIndices.all { idx -> verificationAnswers[idx] == generatedMnemonicList[idx] }
                 3 -> aliasInput.value.isNotBlank()
                 4 -> true
                 5 -> masterPin.value.length == 8
                 else -> true
             }
 
-            CyberButton(
+            CyberActionButton(
+                text = nextText,
+                icon = Icons.AutoMirrored.Filled.ArrowForward,
+                enabled = isNextEnabled,
                 onClick = {
-                    com.example.audio.CyberNoirSynthPlayer.triggerFX(com.example.audio.CyberNoirSynthPlayer.FXType.SUCCESS_CHIME)
+                    CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.SUCCESS_CHIME)
                     if (currentStep < 5) {
                         currentStep += 1
                     } else {
@@ -1076,18 +1004,8 @@ fun OnboardingWizard(viewModel: TarotViewModel, onComplete: () -> Unit) {
                         onComplete()
                     }
                 },
-                skin = currentSkin,
-                modifier = Modifier.width(130.dp).height(44.dp).graphicsLayer { alpha = if (isNextEnabled) 1f else 0.4f },
-                enabled = isNextEnabled
-            ) {
-                Text(
-                    text = nextText,
-                    fontFamily = RajdhaniFontFamily,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
+                modifier = Modifier.graphicsLayer { alpha = if (isNextEnabled) 1f else 0.45f }
+            )
         }
     }
 }

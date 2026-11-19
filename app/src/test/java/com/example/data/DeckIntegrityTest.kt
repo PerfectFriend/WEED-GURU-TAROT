@@ -1,12 +1,17 @@
 package com.example.data
 
+import com.example.R
 import com.example.ui.components.Tarot420Discipline
 import com.example.ui.components.getArcanaRomanNumeral
 import com.example.ui.components.getCard420Discipline
 import com.example.ui.components.getTarotSeriesTheme
+import com.example.ui.screens.UNDER_CONSTRUCTION_CARD_INDICES
 import com.example.ui.screens.getCardBackImage
+import com.example.ui.screens.getCardBackImageForCard
 import com.example.ui.screens.getCardImage
+import com.example.ui.screens.getSuitCardBackImage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,11 +19,11 @@ import org.junit.Test
 class DeckIntegrityTest {
 
     @Test
-    fun allCardsHaveSequentialIndicesAndNonNullUniqueDrawables() {
+    fun allCardsHaveSequentialIndicesAndValidArtOrUnderConstruction() {
         val cards = CyberTarotDeck.cards
-        assertEquals("Expected 31 cards in deck", 31, cards.size)
+        assertEquals("Expected 88 cards in deck (22 Major + 10 Collector + 56 Minor)", 88, cards.size)
 
-        val seenDrawables = mutableSetOf<Int>()
+        val seenCompletedDrawables = mutableSetOf<Int>()
         cards.forEachIndexed { expectedIdx, card ->
             assertEquals("Card index mismatch", expectedIdx, card.index)
             assertTrue("Card name blank at $expectedIdx", card.name.isNotBlank())
@@ -32,10 +37,12 @@ class DeckIntegrityTest {
             val imgRes = getCardImage(card.index)
             assertNotNull("Missing artwork drawable for card #${card.index} (${card.name})", imgRes)
             assertTrue(
-                "Duplicate card artwork drawable at #${card.index} (${card.name})",
-                seenDrawables.add(imgRes!!)
+                "Duplicate completed card artwork drawable at #${card.index} (${card.name})",
+                seenCompletedDrawables.add(imgRes!!)
             )
         }
+        assertEquals("Expected 0 cards left under construction (100% coverage)", 0, UNDER_CONSTRUCTION_CARD_INDICES.size)
+        assertEquals("Expected 88 distinct completed artworks (100% deck coverage)", 88, seenCompletedDrawables.size)
     }
 
     @Test
@@ -54,10 +61,27 @@ class DeckIntegrityTest {
         (29..30).forEach { idx ->
             assertEquals("Seas & Oceans", cards[idx].series)
         }
+        assertEquals("Genesis Series", cards[31].series)
+        assertEquals("GEN·Ω", getArcanaRomanNumeral(31))
+
+        (32..87).forEach { idx ->
+            assertEquals("Cyber Botanica", cards[idx].series)
+        }
+        (32..45).forEach { idx -> assertEquals(Tarot420Discipline.GENETICS, getCard420Discipline(idx)) }
+        (46..59).forEach { idx -> assertEquals(Tarot420Discipline.CANOPY, getCard420Discipline(idx)) }
+        (60..73).forEach { idx -> assertEquals(Tarot420Discipline.RESIN, getCard420Discipline(idx)) }
+        (74..87).forEach { idx -> assertEquals(Tarot420Discipline.ALCHEMY, getCard420Discipline(idx)) }
 
         val expectedSeries = listOf("Cyber Botanica", "Genesis Series", "Amber Series", "Seas & Oceans")
         val backDrawables = expectedSeries.map { series -> getCardBackImage(series) }.toSet()
         assertEquals("Each series must map to a unique card back artwork", expectedSeries.size, backDrawables.size)
+
+        val suitBacks = Tarot420Discipline.entries.map { getSuitCardBackImage(it) }.toSet()
+        assertEquals("All 4 420 suits must map to unique reversible card backs", 4, suitBacks.size)
+
+        val genesisEliminatorBack = getCardBackImageForCard(31, "Genesis Series")
+        assertEquals(R.drawable.back_genesis_elements_1795033577974, genesisEliminatorBack)
+        assertNotEquals(getCardBackImage("Genesis Series"), genesisEliminatorBack)
 
         expectedSeries.forEach { series ->
             val theme = getTarotSeriesTheme(series)

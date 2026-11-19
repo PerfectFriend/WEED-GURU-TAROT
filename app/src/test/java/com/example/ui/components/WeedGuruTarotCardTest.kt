@@ -2,15 +2,19 @@ package com.example.ui.components
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.data.CyberTarotDeck
+import com.example.data.MintedCard
+import com.example.data.WatermarkStateStore
 import com.example.ui.theme.MyApplicationTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,6 +27,11 @@ class WeedGuruTarotCardTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    @Before
+    fun resetWatermarkStore() {
+        WatermarkStateStore.resetForTest()
+    }
 
     @Test
     fun cardFrontDisplaysRomanNumeralTitleAndBottomWeedGuruWatermark() {
@@ -140,5 +149,73 @@ class WeedGuruTarotCardTest {
             "Expected fullscreen card-back watermark near bottom edge",
             backWatermarkBounds.center.y > viewerBoundsFront.center.y + (viewerBoundsFront.height * 0.25f)
         )
+    }
+
+    @Test
+    fun lockedFullscreenWatermarkButtonOpensGenesisEliminatorDialog() {
+        val sproutCard = CyberTarotDeck.getCard(0)
+
+        composeTestRule.setContent {
+            MyApplicationTheme {
+                WeedGuruFullscreenCardViewer(
+                    card = sproutCard,
+                    systemLanguage = "ru",
+                    onDismiss = {}
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("fullscreen_watermark_toggle").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("GENESIS WATERMARK ELIMINATOR").assertIsDisplayed()
+        composeTestRule.onNodeWithText("5.99 USDC ($5.99)").assertIsDisplayed()
+        composeTestRule.onNodeWithText("60 WEED").assertIsDisplayed()
+    }
+
+    @Test
+    fun unlockedGenesisEliminatorCanHideAndRestoreFullscreenWatermark() {
+        WatermarkStateStore.syncOwnedCards(
+            listOf(MintedCard(cardIndex = CyberTarotDeck.GENESIS_ELIMINATOR_INDEX, rarity = "Genesis", mintNumber = 1))
+        )
+        WatermarkStateStore.setWatermarkHidden(true)
+
+        val sproutCard = CyberTarotDeck.getCard(0)
+        composeTestRule.setContent {
+            MyApplicationTheme {
+                WeedGuruFullscreenCardViewer(
+                    card = sproutCard,
+                    systemLanguage = "en",
+                    onDismiss = {}
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // Hidden when unlocked and toggled ON
+        assertEquals(0, composeTestRule.onAllNodesWithTag("weed_guru_property_watermark", useUnmergedTree = true).fetchSemanticsNodes().size)
+
+        // Toggle back ON -> watermark reappears
+        composeTestRule.onNodeWithTag("fullscreen_watermark_toggle").performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(1, composeTestRule.onAllNodesWithTag("weed_guru_property_watermark", useUnmergedTree = true).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun genesisWatermarkEliminatorCardDisplaysGenOmegaAndElementsBack() {
+        val genesisEliminator = CyberTarotDeck.getCard(CyberTarotDeck.GENESIS_ELIMINATOR_INDEX)
+
+        composeTestRule.setContent {
+            MyApplicationTheme {
+                WeedGuruTarotCard(
+                    card = genesisEliminator,
+                    isFlipped = false
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("tarot_card_31").assertIsDisplayed()
+        composeTestRule.onNodeWithText("GEN·Ω").assertIsDisplayed()
     }
 }

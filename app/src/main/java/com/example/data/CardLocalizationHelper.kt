@@ -126,6 +126,10 @@ object CardLocalizationHelper {
         30 to mapOf(
             "en" to "Ocean #02 - Deep Abyss Leviathan", "ru" to "Ocean #02 - Бездна Левиафана", "es" to "Océano #02 - Leviatán del Abismo", "zh" to "海洋 #02 - 深渊利维坦",
             "fr" to "Océan #02 - Léviathan de l'Abysse", "de" to "Ozean #02 - Abgrund-Leviathan", "pt" to "Océano #02 - Leviatã do Abismo", "hi" to "समुद्र #02 - गहरा लेवियाथन"
+        ),
+        31 to mapOf(
+            "en" to "Genesis Watermark Eliminator", "ru" to "Genesis — Снятие Вотермарки", "es" to "Génesis — Eliminador de Marca", "zh" to "创世纪 — 水印消除者",
+            "fr" to "Genèse — Éliminateur de Filigrane", "de" to "Genesis — Wasserzeichen-Entferner", "pt" to "Gênesis — Removedor de Marca", "hi" to "जेनेसिस — वॉटरमार्क एलिमिनेटर"
         )
     )
 
@@ -160,7 +164,8 @@ object CardLocalizationHelper {
         27 to mapOf("en" to "Petrified Light", "ru" to "Окаменевший Свет", "es" to "Luz Petrificada", "zh" to "石化之光", "fr" to "Lumière Pétrifiée", "de" to "Versteinertes Licht", "pt" to "Luz Petrificada", "hi" to "पत्थर बना प्रकाश"),
         28 to mapOf("en" to "Golden Nectar", "ru" to "Золотой Нектар", "es" to "Néctar Dorado", "zh" to "黄金花蜜", "fr" to "Nectar Doré", "de" to "Goldener Nektar", "pt" to "Néctar Dourado", "hi" to "सुनहरा अमृत"),
         29 to mapOf("en" to "Bioluminescent Sanctuary", "ru" to "Биолюминесцентный Оазис", "es" to "Santuario Bioluminiscente", "zh" to "生物发光圣地", "fr" to "Sanctuaire Bioluminescent", "de" to "Biolumineszentes Heiligtum", "pt" to "Santuário Bioluminescente", "hi" to "बायोल्यूमिनसेंट अभयारण्य"),
-        30 to mapOf("en" to "Sovereign of the Deep", "ru" to "Владыка Глубин", "es" to "Soberano de las Profundidades", "zh" to "深渊主宰", "fr" to "Souverain des Profondeurs", "de" to "Herrscher der Tiefe", "pt" to "Soberano das Profundezas", "hi" to "गहराइयों का सम्राट")
+        30 to mapOf("en" to "Sovereign of the Deep", "ru" to "Владыка Глубин", "es" to "Soberano de las Profundidades", "zh" to "深渊主宰", "fr" to "Souverain des Profondeurs", "de" to "Herrscher der Tiefe", "pt" to "Soberano das Profundezas", "hi" to "गहराइयों का सम्राट"),
+        31 to mapOf("en" to "Pure Genesis Seal", "ru" to "Печать Чистого Генезиса", "es" to "Sello Génesis Puro", "zh" to "纯净创世印记", "fr" to "Sceau Genèse Pur", "de" to "Reines Genesis-Siegel", "pt" to "Selo Gênesis Puro", "hi" to "शुद्ध जेनेसिस मुहर")
     )
 
     private val dbCardTranslations = java.util.concurrent.ConcurrentHashMap<Int, CardLocalizationItem>()
@@ -190,6 +195,7 @@ object CardLocalizationHelper {
             }
         }
         return cardNames[index]?.get(lang)
+            ?: MinorArcanaLocalization.getLocalizedName(index, lang)
             ?: cardNames[index]?.get("en")
             ?: CyberTarotDeck.cards.getOrNull(index)?.name
             ?: ""
@@ -213,6 +219,7 @@ object CardLocalizationHelper {
             }
         }
         return traditionalNames[index]?.get(lang)
+            ?: MinorArcanaLocalization.getLocalizedTraditionalName(index, lang)
             ?: traditionalNames[index]?.get("en")
             ?: CyberTarotDeck.cards.getOrNull(index)?.traditionalName
             ?: ""
@@ -234,6 +241,9 @@ object CardLocalizationHelper {
                 "ja" -> item.descriptionJa
                 else -> item.descriptionEn
             }
+        }
+        if (index in 32..87) {
+            MinorArcanaLocalization.getLocalizedDescription(index, lang)?.let { return it }
         }
         val enDesc = CyberTarotDeck.cards.getOrNull(index)?.description ?: ""
         if (lang == "en") return enDesc
@@ -261,7 +271,7 @@ object CardLocalizationHelper {
                 18 -> "Скрытный партизанский садовод проверяет тайную поляну в лесу под бледным серебряным светом луны, скрываясь в тенях."
                 19 -> "Ослепительная двухконтактная ДНаТ-лампа мощностью 1000 Ватт излучает мощный золотой спектр, стимулируя взрывное цветение."
                 20 -> "Сверкающая банка идеально пролеченных шишек получает золотую ленту победителя на престижном кубке Cannabis Cup."
-                21 -> "Захватывающий панорамный вид на залитую солнцем долину, полную легальных зеленых полей медицинского каннабиса."
+                21 -> "Планета Земля, окружённая пышным изумрудным венком органического каннабиса под четырьмя космическими медальонами стихий."
                 22 -> "Фундаментальный субатомный носитель электрического заряда — катализатор клеточной энергии, фотосинтеза и живого света."
                 23 -> "Тяжелое положительное атомное ядро, удерживающее материю вместе силой первичного ядерного притяжения."
                 24 -> "Первородный элемент космоса, питающий звезды, чистую воду и всю органическую химию вселенной."
@@ -271,6 +281,7 @@ object CardLocalizationHelper {
                 28 -> "Концентрированные золотые капли чистой терпеновой смолы и живых трихом, сияющие под янтарным светом."
                 29 -> "Цветущий подводный коралловый риф, пульсирующий голубым биолюминесцентным светом и симбиозом водной экосистемы."
                 30 -> "Величественный глубоководный левиафан, спокойно и неудержимо скользящий по бездонным океаническим желобам."
+                31 -> "Коллекционная золотая карта серии Genesis в стиле Киберпанк, Ван Гог и Гауди. Разрушает вотермарки в полноэкранном просмотре и открывает рубашку Genesis с ростком Жизни, восходящим из Четырёх Стихий."
                 else -> enDesc
             }
             "es" -> "Nodo de cultivo de Ganja #${index}. Representa el misterio de la genética orgánica y los flujos de terpenos."
@@ -300,6 +311,9 @@ object CardLocalizationHelper {
                 else -> item.circuitryElementEn
             }
         }
+        if (index in 32..87) {
+            MinorArcanaLocalization.getLocalizedCircuitryElement(index, lang)?.let { return it }
+        }
         val card = CyberTarotDeck.cards.getOrNull(index)
         val enVal = card?.circuitryElement ?: ""
         if (lang == "en") return enVal
@@ -328,6 +342,7 @@ object CardLocalizationHelper {
                 19 -> "ДНаТ-лампы и пускорегулирующие аппараты"
                 20 -> "Стеклянные банки и пакеты контроля влажности"
                 21 -> "Органическое компостирование и биогумус"
+                31 -> "Оптическая призма Genesis и кристалл чистого холста"
                 else -> enVal
             }
             "es" -> "Módulo del Sistema #${index}: Bus de datos integrados en la matriz de silicio."
@@ -357,6 +372,9 @@ object CardLocalizationHelper {
                 else -> item.cyberMeaningEn
             }
         }
+        if (index in 32..87) {
+            MinorArcanaLocalization.getLocalizedCyberMeaning(index, lang)?.let { return it }
+        }
         val card = CyberTarotDeck.cards.getOrNull(index)
         val enVal = card?.cyberMeaning ?: ""
         if (lang == "en") return enVal
@@ -385,6 +403,7 @@ object CardLocalizationHelper {
                 19 -> "Высочайшая урожайность, плотные тяжелые шишки, гордость за свой продукт."
                 20 -> "Вершина мастерства садовода. Ваши шишки безупречно пролечены и признаны лучшими."
                 21 -> "Успешный цикл полностью завершен. Обилие шишек, семян и абсолютный покой."
+                31 -> "Разблокирует опцию скрытия и показа полноэкранной вотермарки WEED GURU PROPERTY. Рубашка Genesis: рождение Жизни из Огня, Земли, Воды и Воздуха в золотых рамках."
                 else -> enVal
             }
             "es" -> "Significado del cultivo: El flujo de resina indica madurez y el inicio del proceso de secado."
@@ -413,6 +432,9 @@ object CardLocalizationHelper {
                 "ja" -> item.uprightAdviceJa
                 else -> item.uprightAdviceEn
             }
+        }
+        if (index in 32..87) {
+            MinorArcanaLocalization.getLocalizedUprightAdvice(index, lang)?.let { return it }
         }
         val card = CyberTarotDeck.cards.getOrNull(index)
         val enVal = card?.uprightAdvice ?: ""
@@ -451,6 +473,7 @@ object CardLocalizationHelper {
                 28 -> "Сфокусируйтесь на чистой эссенции вместо объема — качество превращается в жидкое золото."
                 29 -> "Создавайте симбиоз и поддерживающее окружение: разнообразие усиливает всю систему."
                 30 -> "Уверенно идите через глубокие воды. Вы сами управляете силой своих глубин."
+                31 -> "Активируйте снятие вотермарки в настройках или полноэкранном просмотре, чтобы любоваться чистым артом без наложений."
                 else -> enVal
             }
             "es" -> "Monitoree la humedad y el pH del suelo para garantizar una absorción de nutrientes óptima."
@@ -479,6 +502,9 @@ object CardLocalizationHelper {
                 "ja" -> item.reversedAdviceJa
                 else -> item.reversedAdviceEn
             }
+        }
+        if (index in 32..87) {
+            MinorArcanaLocalization.getLocalizedReversedAdvice(index, lang)?.let { return it }
         }
         val card = CyberTarotDeck.cards.getOrNull(index)
         val enVal = card?.reversedAdvice ?: ""
@@ -517,6 +543,7 @@ object CardLocalizationHelper {
                 28 -> "Не увязните в чрезмерно густых и сложных деталях — упростите процесс."
                 29 -> "Очистите свою водную среду от токсичных влияний и застоя."
                 30 -> "Не бойтесь давления глубин — укрепите внутренний каркас стойкости."
+                31 -> "Включайте защитную вотермарку обратно в любой момент для сохранения коллекционного статуса."
                 else -> enVal
             }
             "es" -> "Riesgo de moho por alta humedad. Aumente la ventilación de inmediato."

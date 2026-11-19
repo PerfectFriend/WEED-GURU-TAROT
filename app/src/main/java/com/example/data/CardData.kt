@@ -306,7 +306,7 @@ object CyberTarotDeck {
             index = 21,
             name = "The Green Planet",
             traditionalName = "The World",
-            description = "A breathtaking panoramic view of a lush, green, sun-drenched valley filled with legal, organic hemp and medical cannabis fields.",
+            description = "Planet Earth encircled by a lush emerald wreath of legal organic hemp and flowering cannabis under four cosmic elemental medallions.",
             uprightKeywords = listOf("Horticultural Flow", "Complete Harvest", "Abundant Supply", "Green Synthesis"),
             reversedKeywords = listOf("Unfinished Cure", "Delayed Trim", "Local Frost", "Incomplete Loop"),
             circuitryElement = "Organic Composting & Living Soil Buffers",
@@ -431,7 +431,7 @@ object CyberTarotDeck {
             index = 30,
             name = "Ocean #02 - Deep Abyss Leviathan",
             traditionalName = "Sovereign of the Deep",
-            description = "A massive cybernetic leviathan navigating the abyssal trenches with calm, unstoppable majesty.",
+            description = "A massive bioluminescent sea dragon leviathan navigating the abyssal trenches with calm, unstoppable majesty.",
             uprightKeywords = listOf("Abyssal Power", "Unstoppable Force", "Deep Wisdom", "Leviathan Tide"),
             reversedKeywords = listOf("Crushing Pressure", "Deep Dark", "Unseen Monster", "Tidal Surge"),
             circuitryElement = "Sub-Oceanic Pressure Quantum Engine",
@@ -440,8 +440,26 @@ object CyberTarotDeck {
             reversedAdvice = "Do not fear the dark depths; build pressure resistance within your core.",
             defaultRarity = "Legend",
             series = "Seas & Oceans"
+        ),
+        CyberTarotCard(
+            index = 31,
+            name = "Genesis Watermark Eliminator",
+            traditionalName = "Pure Genesis Seal",
+            description = "A sovereign Genesis crystal card fused in Cyberpunk, Van Gogh, and Gaudi gold mosaic artistry. Shatters fullscreen watermarks into pure light, backed by the Genesis Emergence of Life sprout rising from the Four Elements.",
+            uprightKeywords = listOf("Watermark Removal", "Pure Canvas", "Genesis Clarity", "Unobstructed Art"),
+            reversedKeywords = listOf("Veiled Seal", "Sealed Frame", "Hidden Layer", "Filtered View"),
+            circuitryElement = "Genesis Optical Prism & Zero-Watermark Core",
+            cyberMeaning = "Unlocks the permanent toggle to remove the WEED GURU PROPERTY watermark across fullscreen card views. Backed by the gold-framed Genesis card back depicting Life emerging from Air, Water, Fire, and Earth.",
+            uprightAdvice = "Activate watermark elimination in Settings or Fullscreen View to admire pure, unobstructed Cyberpunk-Van-Gogh-Gaudi card art.",
+            reversedAdvice = "Toggle the collector seal back on whenever you want archival provenance protection.",
+            defaultRarity = "Genesis",
+            series = "Genesis Series"
         )
-    )
+    ) + minorArcanaCards
+
+    const val GENESIS_ELIMINATOR_INDEX = 31
+    const val GENESIS_ELIMINATOR_USD_PRICE = 5.99
+    const val GENESIS_ELIMINATOR_WEED_EQUIVALENT = 60
 
     fun getCard(index: Int): CyberTarotCard {
         return cards.firstOrNull { it.index == index } ?: cards[0]

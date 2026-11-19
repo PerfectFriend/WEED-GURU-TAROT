@@ -9,4 +9,78 @@
     <string name="widget_default_subtitle">Маг • Genesis</string>
     <string name="widget_default_advice">Оракул: Мастерство четырех стихий. Начните новый цикл культивации.</string>
     <string name="widget_action_prompt">➔ ОТКРЫТЬ В ХАБЕ</string>
+
+    <string name="cd_cyber_radio">Консоль кибер-радио</string>
+    <string name="cd_weed_credits">Кредиты WEED</string>
+    <string name="balance_weed_format">%1$d WEED</string>
+
+    <string name="tab_sub_divination">Ботанический Оракул</string>
+    <string name="tab_sub_cards">Коллекция и Боевая Колода</string>
+    <string name="tab_sub_arena">Боевая Арена</string>
+    <string name="tab_sub_crypto">Кошелёк, Обмен и NFT</string>
+    <string name="tab_sub_settings">Настройки и Безопасность</string>
+
+    <string name="splash_validating_profile">Проверка профиля...</string>
+    <string name="splash_launching_setup">Запуск настройки профиля...</string>
+    <string name="splash_subtitle">БОТАНИЧЕСКИЙ ОРАКУЛ</string>
+    <string name="action_enter">Войти</string>
+    <string name="action_dismiss">Закрыть</string>
+    <string name="action_delete">Удалить</string>
+
+    <string name="cards_tab_vault">Моя коллекция</string>
+    <string name="cards_tab_deck">Боевая колода</string>
+
+    <string name="divination_title">Спросите Оракула</string>
+    <string name="divination_subtitle">Живой диалог с арканами Таро</string>
+    <string name="divination_prompt_header">ВОПРОС ДЛЯ ОРАКУЛА</string>
+    <string name="divination_prompt_placeholder">Опишите ваш вопрос или ситуацию для Оракула...</string>
+    <string name="divination_spread_header">ГЛУБИНА РАСКЛАДА</string>
+    <string name="spread_single_title">ОДНА КАРТА (1)</string>
+    <string name="spread_single_sub">Быстрый разбор</string>
+    <string name="spread_flow_title">ПОТОК (3)</string>
+    <string name="spread_flow_sub">Линия времени</string>
+    <string name="spread_romantic_title">ОТНОШЕНИЯ (5)</string>
+    <string name="spread_romantic_sub">Совместимость</string>
+    <string name="spread_celtic_title">КРЕСТ (10)</string>
+    <string name="spread_celtic_sub">Кельтский Крест</string>
+    <string name="spread_reward_1">Награда +50 WEED • Быстрый разбор</string>
+    <string name="spread_reward_3">Награда +150 WEED • Карта временных потоков</string>
+    <string name="spread_reward_5">Премиум • +250 WEED глубокий анализ отношений</string>
+    <string name="spread_reward_10">Мастер-расклад • +500 WEED полная расшифровка</string>
+
+    <string name="oracle_blessings_title">КВЕСТЫ И ДАРЫ ОРАКУЛА</string>
+    <string name="oracle_blessings_sub">Забирайте награды за квесты, бустите майнинг и открывайте VIP-каналы.</string>
+
+    <string name="vip_dialog_title">ТРЕБУЕТСЯ VIP-ДОСТУП</string>
+    <string name="vip_dialog_body">Расклад на %1$d карт является премиальным. Спишите %2$d WEED за разовое сканирование или откройте Портал Даров для полного доступа.</string>
+    <string name="vip_spend_format">Списать %1$d</string>
+    <string name="vip_lease_acquired">Разовый доступ открыт. Сканирование...</string>
+    <string name="vip_insufficient_credits">Недостаточно WEED для расклада.</string>
+    <string name="vip_portal_button">Портал Даров</string>
+
+    <string name="divination_initialize_scan">Сделать расклад</string>
+    <string name="divination_history_title">ИСТОРИЯ РАСКЛАДОВ</string>
+    <string name="divination_no_question">Без вопроса</string>
+    <string name="divination_scanning_title">СИНХРОНИЗАЦИЯ КАНАЛА ОРАКУЛА...</string>
+    <string name="divination_scan_log_1">Инициализация ядра Оракула...</string>
+    <string name="divination_scan_log_2">Обращение к базе Арканов...</string>
+    <string name="divination_scan_log_3">Открытие защищённого канала...</string>
+    <string name="divination_scan_log_4">Декодирование векторов карт...</string>
+    <string name="divination_scan_log_5">Синтез итогового отчёта...</string>
+    <string name="divination_complete">РАСКЛАД ЗАВЕРШЁН</string>
+    <string name="divination_new_scan">Новый расклад</string>
+    <string name="divination_question_format">Вопрос: «%1$s»</string>
+    <string name="divination_report_header">ТОЛКОВАНИЕ ОРАКУЛА</string>
+    <string name="divination_stop_voice">Остановить голос</string>
+    <string name="divination_speak_voice">Озвучить расклад</string>
+
+    <string name="card_tap_to_reveal">НАЖМИТЕ ДЛЯ ОТКРЫТИЯ</string>
+    <string name="card_mint_nft">СОЗДАТЬ NFT (200 N$)</string>
+    <string name="card_minted">СОЗДАНО NFT</string>
+    <string name="cd_open">Открыть</string>
+    <string name="cd_history">История</string>
+    <string name="cd_toggle">Раскрыть</string>
+    <string name="cd_scanning">Сканирование</string>
+    <string name="cd_reset">Сбросить</string>
+    <string name="cd_mint_format">Создать NFT %1$s</string>
 </resources>

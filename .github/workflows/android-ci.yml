@@ -43,6 +43,9 @@ jobs:
             exit 1
           fi
 
+      - name: Check design debt ratchet
+        run: bash scripts/design-lint.sh
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:

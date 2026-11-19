@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,6 +32,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.audio.CyberNoirSynthPlayer
+import com.example.ui.theme.Cyber
+import com.example.ui.theme.CyberShapes
+import com.example.ui.theme.IbmPlexMonoFontFamily
+import com.example.ui.theme.IbmPlexSansFontFamily
+import com.example.ui.theme.NeonAmber
+import com.example.ui.theme.NeonCyan
+import com.example.ui.theme.Space
+import com.example.ui.theme.rememberMotionEnabled
 import com.example.viewmodel.TarotViewModel
 import kotlinx.coroutines.launch
 
@@ -91,40 +98,36 @@ fun DuelArenaScreen(
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "duel_pulse")
-    val pulseGlow by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_glow"
-    )
+    val motionEnabled = rememberMotionEnabled()
+    val pulseGlow = if (motionEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "duel_pulse")
+        infiniteTransition.animateFloat(
+            initialValue = 0.4f,
+            targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulse_glow"
+        ).value
+    } else {
+        0.7f
+    }
 
+    val c = Cyber.colors
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF04060C))
+            .background(c.ink)
     ) {
-        // Background Matrix Grid effect
         Canvas(modifier = Modifier.fillMaxSize()) {
             val step = 48.dp.toPx()
+            val gridColor = c.panelRaised.copy(alpha = 0.55f)
             for (x in 0..(size.width / step).toInt()) {
-                drawLine(
-                    color = Color(0xFF0D1B2A).copy(alpha = 0.4f),
-                    start = Offset(x * step, 0f),
-                    end = Offset(x * step, size.height),
-                    strokeWidth = 1f
-                )
+                drawLine(gridColor, Offset(x * step, 0f), Offset(x * step, size.height), 1f)
             }
             for (y in 0..(size.height / step).toInt()) {
-                drawLine(
-                    color = Color(0xFF0D1B2A).copy(alpha = 0.4f),
-                    start = Offset(0f, y * step),
-                    end = Offset(size.width, y * step),
-                    strokeWidth = 1f
-                )
+                drawLine(gridColor, Offset(0f, y * step), Offset(size.width, y * step), 1f)
             }
         }
 
@@ -134,25 +137,21 @@ fun DuelArenaScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(duelScrollState)
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(horizontal = Space.md, vertical = Space.xs)
         ) {
-            // Top HUD
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 6.dp),
+                    .padding(bottom = Space.xs),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
                     onClick = {
-                        if (duelState.winner == null) {
-                            showSurrenderConfirm = true
-                        } else {
-                            onBack()
-                        }
+                        if (duelState.winner == null) showSurrenderConfirm = true else onBack()
                     },
-                    modifier = Modifier.testTag("duel_back_button")
+                    modifier = Modifier.size(48.dp).testTag("duel_back_button")
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -162,28 +161,26 @@ fun DuelArenaScreen(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0x99111827),
+                    shape = CyberShapes.chip,
+                    color = c.panel.copy(alpha = 0.85f),
                     border = BorderStroke(1.dp, currentSkin.primaryColor.copy(alpha = 0.4f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = Space.md, vertical = Space.xs),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(Space.xs)
                     ) {
                         Text(
                             text = if (lang == "ru") "ХОД ${duelState.turnNumber}" else "TURN ${duelState.turnNumber}",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = currentSkin.primaryColor,
-                            fontSize = 12.sp
+                            style = MaterialTheme.typography.labelMedium,
+                            color = currentSkin.primaryColor
                         )
                         Box(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (duelState.isPlayerTurn && !duelState.isAiThinking) Color(0xFF00FF66) else Color(0xFFFF5252)
+                                    if (duelState.isPlayerTurn && !duelState.isAiThinking) c.emeraldGlow else c.danger
                                 )
                         )
                         Text(
@@ -192,37 +189,32 @@ fun DuelArenaScreen(
                             } else {
                                 if (lang == "ru") "ХОД ИИ..." else "AI TURN..."
                             },
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
-                            fontSize = 11.sp
+                            style = MaterialTheme.typography.labelMedium,
+                            color = c.textHigh
                         )
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // DI.FM Cyber Radio Console Launcher Button
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                     IconButton(
                         onClick = { showRadioInDuel = true },
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(48.dp)
                             .background(
-                                if (radioState.isPlaying) currentSkin.primaryColor.copy(alpha = 0.2f) else Color(0x15FFFFFF),
+                                if (radioState.isPlaying) currentSkin.primaryColor.copy(alpha = 0.2f) else c.panelRaised,
                                 CircleShape
                             )
                             .border(
                                 1.dp,
-                                if (radioState.isPlaying) currentSkin.primaryColor else Color(0x22FFFFFF),
+                                if (radioState.isPlaying) currentSkin.primaryColor else c.goldAntique.copy(alpha = 0.3f),
                                 CircleShape
                             )
                             .testTag("duel_radio_button")
                     ) {
                         if (radioState.isPlaying) {
                             Row(
-                                modifier = Modifier
-                                    .width(14.dp)
-                                    .height(11.dp),
-                                horizontalArrangement = Arrangement.spacedBy(1.dp),
+                                modifier = Modifier.width(16.dp).height(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(1.5.dp),
                                 verticalAlignment = Alignment.Bottom
                             ) {
                                 radioState.visualizerBars.take(3).forEach { bar ->
@@ -237,9 +229,9 @@ fun DuelArenaScreen(
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Radio,
-                                contentDescription = "Radio DI.FM",
-                                tint = if (radioState.isBuffering) Color(0xFFFFB800) else Color.LightGray,
-                                modifier = Modifier.size(15.dp)
+                                contentDescription = "Radio",
+                                tint = if (radioState.isBuffering) NeonAmber else c.textMid,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
@@ -249,22 +241,24 @@ fun DuelArenaScreen(
                             CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
                             isP2pLobbyOpen = true
                         },
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, Color(0xFF00FF66)),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        modifier = Modifier.height(28.dp)
+                        shape = CyberShapes.chip,
+                        border = BorderStroke(1.dp, c.emeraldGlow),
+                        contentPadding = PaddingValues(horizontal = Space.sm, vertical = Space.xs),
+                        modifier = Modifier.heightIn(min = 48.dp)
                     ) {
-                        Text("P2P 🌐", fontSize = 10.sp, color = Color(0xFF00FF66), fontWeight = FontWeight.Bold)
+                        Icon(imageVector = Icons.Default.Public, contentDescription = null, tint = c.emeraldGlow, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("P2P", style = MaterialTheme.typography.labelMedium, color = c.emeraldGlow)
                     }
 
                     IconButton(
                         onClick = { engine.startMatch("Normal") },
-                        modifier = Modifier.testTag("duel_restart_button")
+                        modifier = Modifier.size(48.dp).testTag("duel_restart_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Restart Match",
-                            tint = Color(0xFFAAAAAA)
+                            tint = c.textMid
                         )
                     }
                 }
@@ -381,22 +375,19 @@ fun DuelArenaScreen(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Player Hand
             Text(
                 text = if (lang == "ru") "КАРТЫ В РУКЕ (${duelState.playerHand.size}/6):" else "HAND CARDS (${duelState.playerHand.size}/6):",
-                fontFamily = FontFamily.Monospace,
-                fontSize = 10.sp,
-                color = Color(0xFF888899),
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                style = MaterialTheme.typography.labelMedium,
+                color = c.textMid,
+                modifier = Modifier.padding(horizontal = Space.xs, vertical = Space.xxs)
             )
 
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(130.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 4.dp)
+                    .height(136.dp),
+                horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                contentPadding = PaddingValues(horizontal = Space.xs)
             ) {
                 items(duelState.playerHand, key = { it.instanceId }) { card ->
                     val isSelected = selectedHandCard?.instanceId == card.instanceId
@@ -414,7 +405,6 @@ fun DuelArenaScreen(
             }
         }
 
-        // Victory / Defeat Overlay Dialog
         duelState.winner?.let { duelWinner ->
             DuelResultDialog(
                 winner = duelWinner,
@@ -432,7 +422,6 @@ fun DuelArenaScreen(
             )
         }
 
-        // Surrender confirm dialog
         if (showSurrenderConfirm) {
             AlertDialog(
                 onDismissRequest = { showSurrenderConfirm = false },
@@ -443,7 +432,7 @@ fun DuelArenaScreen(
                         showSurrenderConfirm = false
                         onBack()
                     }) {
-                        Text(if (lang == "ru") "Сдаться" else "Surrender", color = Color(0xFFFF5252))
+                        Text(if (lang == "ru") "Сдаться" else "Surrender", color = c.danger)
                     }
                 },
                 dismissButton = {
@@ -456,6 +445,7 @@ fun DuelArenaScreen(
 
         if (showRadioInDuel) {
             com.example.ui.components.CyberRadioConsoleDialog(
+                systemLanguage = lang,
                 onDismiss = { showRadioInDuel = false }
             )
         }
@@ -467,86 +457,79 @@ private fun EnemyZoneCard(
     state: DuelState,
     lang: String
 ) {
+    val c = Cyber.colors
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xE6121422),
-        border = BorderStroke(1.dp, Color(0xFFFF5252).copy(alpha = 0.5f))
+        shape = CyberShapes.cardCompact,
+        color = c.panel.copy(alpha = 0.92f),
+        border = BorderStroke(1.dp, c.danger.copy(alpha = 0.55f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = Space.md, vertical = Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(Space.sm)
             ) {
                 Box(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF2A0A10))
-                        .border(1.dp, Color(0xFFFF5252), CircleShape),
+                        .background(c.danger.copy(alpha = 0.16f))
+                        .border(1.dp, c.danger, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("🤖", fontSize = 18.sp)
+                    Icon(imageVector = Icons.Default.Memory, contentDescription = null, tint = c.danger, modifier = Modifier.size(18.dp))
                 }
 
                 Column {
                     Text(
                         text = if (lang == "ru") "Нейро-Демиург v4" else "Neuro-Demiurge v4",
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        fontSize = 13.sp
+                        style = MaterialTheme.typography.titleSmall,
+                        color = c.textHigh
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(Space.xs)
                     ) {
                         Text(
                             text = "HP: ${state.enemyHp}/${state.enemyMaxHp}",
-                            color = Color(0xFFFF5252),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            style = MaterialTheme.typography.labelSmall,
+                            color = c.danger
                         )
                         if (state.enemyShield > 0) {
                             Text(
-                                text = "🛡️ +${state.enemyShield}",
-                                color = Color(0xFF00F5FF),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
+                                text = "SH +${state.enemyShield}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = NeonCyan
                             )
                         }
                     }
                 }
             }
 
-            // Enemy RAM dots & Hand count
             Column(horizontalAlignment = Alignment.End) {
                 Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     for (i in 1..state.enemyMaxEnergy) {
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
-                                .clip(RoundedCornerShape(2.dp))
+                                .clip(CyberShapes.chip)
                                 .background(
-                                    if (i <= state.enemyEnergy) Color(0xFFFFB800) else Color(0xFF333344)
+                                    if (i <= state.enemyEnergy) NeonAmber else c.panelRaised
                                 )
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(Space.xs))
                 Text(
-                    text = "${state.enemyHandSize} cards in hand",
-                    color = Color(0xFF888899),
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace
+                    text = if (lang == "ru") "${state.enemyHandSize} в руке" else "${state.enemyHandSize} in hand",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c.textMid
                 )
             }
         }
@@ -558,43 +541,43 @@ private fun CombatCenterStrip(
     state: DuelState,
     primaryColor: Color
 ) {
+    val c = Cyber.colors
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = Color(0xCC090C15),
-        border = BorderStroke(1.dp, Color(0xFF1F2937))
+        shape = CyberShapes.chip,
+        color = c.panel.copy(alpha = 0.88f),
+        border = BorderStroke(1.dp, c.goldAntique.copy(alpha = 0.3f))
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+            modifier = Modifier.padding(horizontal = Space.sm, vertical = Space.xs)
         ) {
-            // Elemental Circle Reminder
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ElementTag(ElementAffinity.CYBER)
-                Text("➔", color = Color.Gray, fontSize = 9.sp)
+                Text("➔", style = MaterialTheme.typography.labelSmall, color = c.textMid)
                 ElementTag(ElementAffinity.BIO)
-                Text("➔", color = Color.Gray, fontSize = 9.sp)
+                Text("➔", style = MaterialTheme.typography.labelSmall, color = c.textMid)
                 ElementTag(ElementAffinity.VOID)
-                Text("➔", color = Color.Gray, fontSize = 9.sp)
+                Text("➔", style = MaterialTheme.typography.labelSmall, color = c.textMid)
                 ElementTag(ElementAffinity.QUANTUM)
-                Text("➔", color = Color.Gray, fontSize = 9.sp)
+                Text("➔", style = MaterialTheme.typography.labelSmall, color = c.textMid)
                 ElementTag(ElementAffinity.CYBER)
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(Space.xs))
 
-            // Latest Combat Log entry
             val latestLog = state.combatLog.firstOrNull() ?: "Готов к синхронизации."
             Text(
                 text = latestLog,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
-                color = if (latestLog.contains("ПОБЕДА")) Color(0xFF00FF66)
-                else if (latestLog.contains("ПОРАЖЕНИЕ")) Color(0xFFFF5252)
-                else primaryColor,
+                style = MaterialTheme.typography.labelSmall,
+                color = when {
+                    latestLog.contains("ПОБЕДА") -> c.emeraldGlow
+                    latestLog.contains("ПОРАЖЕНИЕ") -> c.danger
+                    else -> primaryColor
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -608,13 +591,11 @@ private fun ElementTag(element: ElementAffinity) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Text(element.symbol, fontSize = 10.sp)
+        Text(element.symbol, style = MaterialTheme.typography.labelSmall)
         Text(
             text = element.name,
             color = element.color,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
+            style = MaterialTheme.typography.labelSmall
         )
     }
 }
@@ -627,24 +608,24 @@ private fun BoardCardView(
     canAttack: Boolean = false,
     onClick: () -> Unit
 ) {
-    val borderColor = if (canAttack) Color(0xFF00F5FF) else card.element.color.copy(alpha = 0.7f)
+    val c = Cyber.colors
+    val borderColor = if (canAttack) NeonCyan else card.element.color.copy(alpha = 0.7f)
 
     Surface(
         modifier = Modifier
             .fillMaxSize()
             .clickable(enabled = canAttack || isTargetable, onClick = onClick)
             .testTag(if (isPlayer) "player_card_slot" else "enemy_card_slot"),
-        shape = RoundedCornerShape(8.dp),
-        color = Color(0xFF101322),
+        shape = CyberShapes.chip,
+        color = c.panelRaised,
         border = BorderStroke(if (canAttack) 2.dp else 1.dp, borderColor)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(4.dp),
+                .padding(Space.xs),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header: Element symbol & Cost
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -652,82 +633,65 @@ private fun BoardCardView(
             ) {
                 Text(
                     text = "${card.element.symbol} ${card.element.name}",
-                    fontSize = 9.sp,
+                    style = MaterialTheme.typography.labelSmall,
                     color = card.element.color,
-                    fontWeight = FontWeight.Bold
+                    maxLines = 1
                 )
                 if (card.specialEffect != null) {
-                    Text("⚡", fontSize = 9.sp, color = Color(0xFFFFB800))
+                    Text("⚡", style = MaterialTheme.typography.labelSmall, color = NeonAmber)
                 }
             }
 
-            // Name
             Text(
                 text = card.name,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp,
-                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                color = c.textHigh,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Attack action button or status
             if (isPlayer) {
                 if (canAttack) {
                     Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = Color(0xFF00F5FF),
+                        shape = CyberShapes.chip,
+                        color = NeonCyan,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "⚔️ АТАКА",
-                            color = Color.Black,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 9.sp,
+                            text = "АТАКА",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = c.ink,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(vertical = 2.dp)
+                            modifier = Modifier.padding(vertical = Space.xxs)
                         )
                     }
                 } else if (card.hasAttackedThisTurn) {
                     Text(
                         text = "ОТДЫХ",
-                        color = Color(0xFF666677),
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = c.textMid,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
 
-            // Stats footer: Power & Defense
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Power
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("⚔️", fontSize = 10.sp)
-                    Text(
-                        text = "${card.currentPower}",
-                        color = Color(0xFFFFB800),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
-                }
-                // Defense / HP
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🛡️", fontSize = 10.sp)
-                    Text(
-                        text = "${card.currentDefense}",
-                        color = Color(0xFF00FF66),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
-                }
+                Text(
+                    text = "A:${card.currentPower}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NeonAmber
+                )
+                Text(
+                    text = "D:${card.currentDefense}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c.emeraldGlow
+                )
             }
         }
     }
@@ -741,15 +705,16 @@ private fun EmptySlotView(
     glowMultiplier: Float = 1.0f,
     onClick: () -> Unit
 ) {
-    val strokeColor = if (isHighlighted) Color(0xFF00F5FF).copy(alpha = glowMultiplier)
-    else if (isEnemy) Color(0xFF332222)
-    else Color(0xFF22283A)
+    val c = Cyber.colors
+    val strokeColor = if (isHighlighted) NeonCyan.copy(alpha = glowMultiplier)
+    else if (isEnemy) c.danger.copy(alpha = 0.25f)
+    else c.goldAntique.copy(alpha = 0.25f)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF080B14))
+            .clip(CyberShapes.chip)
+            .background(c.panel.copy(alpha = 0.8f))
             .drawBehind {
                 drawRoundRect(
                     color = strokeColor,
@@ -762,15 +727,11 @@ private fun EmptySlotView(
             .clickable(enabled = isHighlighted, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = if (isHighlighted) "ВЫЛОЖИТЬ" else "СЛОТ $slotLabel",
-                fontFamily = FontFamily.Monospace,
-                fontSize = if (isHighlighted) 10.sp else 9.sp,
-                fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
-                color = if (isHighlighted) Color(0xFF00F5FF) else Color(0xFF555566)
-            )
-        }
+        Text(
+            text = if (isHighlighted) "ВЫЛОЖИТЬ" else "СЛОТ $slotLabel",
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isHighlighted) NeonCyan else c.textMid
+        )
     }
 }
 
@@ -781,27 +742,27 @@ private fun HandCardView(
     canAfford: Boolean,
     onClick: () -> Unit
 ) {
-    val borderColor = if (isSelected) Color(0xFF00F5FF)
+    val c = Cyber.colors
+    val borderColor = if (isSelected) NeonCyan
     else if (canAfford) card.element.color.copy(alpha = 0.8f)
-    else Color(0xFF333344)
+    else c.textMid.copy(alpha = 0.3f)
 
     Surface(
         modifier = Modifier
-            .width(96.dp)
+            .width(102.dp)
             .fillMaxHeight()
             .clickable(onClick = onClick)
             .testTag("hand_card_${card.cardIndex}"),
-        shape = RoundedCornerShape(8.dp),
-        color = if (isSelected) Color(0xFF142038) else Color(0xFF0E121E),
+        shape = CyberShapes.chip,
+        color = if (isSelected) c.panelRaised else c.panel,
         border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(4.dp),
+                .padding(Space.xs),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Cost & Element
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -809,63 +770,54 @@ private fun HandCardView(
             ) {
                 Surface(
                     shape = CircleShape,
-                    color = if (canAfford) Color(0xFF00F5FF) else Color(0xFF444455),
-                    modifier = Modifier.size(18.dp)
+                    color = if (canAfford) NeonCyan else c.panelRaised,
+                    modifier = Modifier.size(20.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = "${card.energyCost}",
-                            color = Color.Black,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 10.sp
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (canAfford) c.ink else c.textMid
                         )
                     }
                 }
                 Text(
                     text = card.element.symbol,
-                    fontSize = 12.sp
+                    style = MaterialTheme.typography.labelMedium
                 )
             }
 
-            // Card name
             Text(
                 text = card.name,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp,
-                color = if (canAfford) Color.White else Color(0xFF888899),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (canAfford) c.textHigh else c.textMid,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 11.sp
+                overflow = TextOverflow.Ellipsis
             )
 
-            // Special effect pill
             if (card.specialEffect != null) {
                 Text(
                     text = card.specialEffect.titleRu,
-                    fontSize = 8.sp,
-                    color = Color(0xFFFFB800),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NeonAmber,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            // Power / Defense
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "⚔️${card.currentPower}",
-                    color = Color(0xFFFFB800),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp
+                    text = "A:${card.currentPower}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NeonAmber
                 )
                 Text(
-                    text = "🛡️${card.currentDefense}",
-                    color = Color(0xFF00FF66),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp
+                    text = "D:${card.currentDefense}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c.emeraldGlow
                 )
             }
         }
@@ -880,106 +832,95 @@ private fun PlayerVitalStatsRow(
     lang: String,
     onEndTurn: () -> Unit
 ) {
+    val c = Cyber.colors
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xE6101424),
-        border = BorderStroke(1.dp, primaryColor.copy(alpha = 0.4f))
+        shape = CyberShapes.cardCompact,
+        color = c.panel.copy(alpha = 0.92f),
+        border = BorderStroke(1.dp, primaryColor.copy(alpha = 0.45f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = Space.sm, vertical = Space.xs),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Player Avatar info
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(Space.sm)
             ) {
                 Box(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF003838))
+                        .background(c.panelRaised)
                         .border(1.dp, primaryColor, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("⚡", fontSize = 16.sp)
+                    Icon(imageVector = Icons.Default.Bolt, contentDescription = null, tint = primaryColor, modifier = Modifier.size(16.dp))
                 }
 
                 Column {
                     Text(
                         text = playerName,
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        style = MaterialTheme.typography.labelMedium,
+                        color = c.textHigh
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                         Text(
                             text = "HP: ${state.playerHp}/${state.playerMaxHp}",
-                            color = Color(0xFF00FF66),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            style = MaterialTheme.typography.labelSmall,
+                            color = c.emeraldGlow
                         )
                         if (state.playerShield > 0) {
                             Text(
-                                text = "🛡️ +${state.playerShield}",
-                                color = Color(0xFF00F5FF),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
+                                text = "SH +${state.playerShield}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = NeonCyan
                             )
                         }
                     }
                 }
             }
 
-            // Player Energy RAM
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "RAM ${state.playerEnergy}/${state.playerMaxEnergy}",
-                    color = Color(0xFF00F5FF),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NeonCyan
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     for (i in 1..state.playerMaxEnergy) {
                         Box(
                             modifier = Modifier
                                 .size(9.dp)
-                                .clip(RoundedCornerShape(2.dp))
+                                .clip(CyberShapes.chip)
                                 .background(
-                                    if (i <= state.playerEnergy) Color(0xFF00F5FF) else Color(0xFF223344)
+                                    if (i <= state.playerEnergy) NeonCyan else c.panelRaised
                                 )
                         )
                     }
                 }
             }
 
-            // End Turn Button
             Button(
                 onClick = onEndTurn,
                 enabled = state.isPlayerTurn && !state.isAiThinking,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = primaryColor,
-                    disabledContainerColor = Color(0xFF222838)
+                    disabledContainerColor = c.panelRaised
                 ),
-                shape = RoundedCornerShape(6.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                shape = CyberShapes.chip,
+                contentPadding = PaddingValues(horizontal = Space.md, vertical = Space.xs),
                 modifier = Modifier
-                    .height(36.dp)
+                    .heightIn(min = 48.dp)
                     .testTag("end_turn_button")
             ) {
                 Text(
-                    text = if (lang == "ru") "ХОД ➔" else "END ➔",
-                    color = Color.Black,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 11.sp
+                    text = if (lang == "ru") "ХОД" else "END",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = c.ink
                 )
             }
         }
@@ -994,34 +935,37 @@ private fun DuelResultDialog(
     onRestart: () -> Unit,
     onExit: () -> Unit
 ) {
+    val c = Cyber.colors
     Dialog(onDismissRequest = onExit) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0xFF0B0F1C),
+            shape = CyberShapes.card,
+            color = c.panel,
             border = BorderStroke(
                 2.dp,
-                if (winner == DuelWinner.PLAYER) Color(0xFF00FF66) else Color(0xFFFF5252)
+                if (winner == DuelWinner.PLAYER) c.emeraldGlow else c.danger
             ),
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(Space.lg)
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier.padding(Space.xl),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = if (winner == DuelWinner.PLAYER) "🏆 ПОБЕДА!" else "💀 ПОРАЖЕНИЕ",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Black,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (winner == DuelWinner.PLAYER) Color(0xFF00FF66) else Color(0xFFFF5252)
+                    text = if (winner == DuelWinner.PLAYER) {
+                        if (lang == "ru") "ПОБЕДА" else "VICTORY"
+                    } else {
+                        if (lang == "ru") "ПОРАЖЕНИЕ" else "DEFEAT"
+                    },
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = if (winner == DuelWinner.PLAYER) c.emeraldGlow else c.danger
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(Space.sm))
 
                 Text(
                     text = if (winner == DuelWinner.PLAYER) {
                         if (lang == "ru")
-                            "Вы успешно перегрузили ядро Нейро-Демиурга!\nПолучено: +150 WEED Credits, +50 XP"
+                            "Вы перегрузили ядро Нейро-Демиурга!\nПолучено: +150 WEED Credits, +50 XP"
                         else
                             "You overcharged the Neuro-Demiurge core!\nRewards: +150 WEED Credits, +50 XP"
                     } else {
@@ -1031,30 +975,29 @@ private fun DuelResultDialog(
                             "Your neural node was disconnected. Recalibrate your deck."
                     },
                     textAlign = TextAlign.Center,
-                    fontSize = 13.sp,
-                    color = Color.White,
-                    fontFamily = FontFamily.SansSerif
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = c.textHigh
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(Space.lg))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Space.sm)
                 ) {
                     OutlinedButton(
                         onClick = onExit,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) {
-                        Text(if (lang == "ru") "В Хаб" else "Hub", color = Color.White)
+                        Text(if (lang == "ru") "В Хаб" else "Hub", color = c.textHigh)
                     }
 
                     Button(
                         onClick = onRestart,
                         colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) {
-                        Text(if (lang == "ru") "Реванш" else "Rematch", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text(if (lang == "ru") "Реванш" else "Rematch", color = c.ink, fontWeight = FontWeight.Bold)
                     }
                 }
             }

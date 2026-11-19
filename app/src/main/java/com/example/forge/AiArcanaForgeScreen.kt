@@ -1,48 +1,85 @@
 package com.example.forge
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.audio.CyberNoirSynthPlayer
 import com.example.data.GeminiService
 import com.example.data.GeneratedArcanaData
 import com.example.duel.ElementAffinity
+import com.example.ui.components.CyberChip
+import com.example.ui.components.CyberPanel
+import com.example.ui.theme.Cyber
+import com.example.ui.theme.CyberShapes
+import com.example.ui.theme.IbmPlexMonoFontFamily
+import com.example.ui.theme.NeonAmber
+import com.example.ui.theme.NeonCyan
+import com.example.ui.theme.Space
+import com.example.ui.theme.rememberMotionEnabled
 import com.example.viewmodel.TarotViewModel
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiArcanaForgeScreen(
     viewModel: TarotViewModel,
     onBack: (() -> Unit)? = null
 ) {
+    val c = Cyber.colors
     val coroutineScope = rememberCoroutineScope()
     val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
-    val currentSkin by viewModel.currentSkin.collectAsStateWithLifecycle()
     val lang = userProfile?.systemLanguage ?: "en"
 
     var userConcept by remember { mutableStateOf("") }
@@ -51,95 +88,101 @@ fun AiArcanaForgeScreen(
     var isSavedToCollection by remember { mutableStateOf(false) }
 
     val presetSuggestions = listOf(
-        "⚡ Квантовый Самурай Матрицы",
-        "🌿 Неоновый Био-Шаман",
-        "🔮 Дракон Темной Материи",
-        "🌑 Призрак Нулевого Байта",
-        "🧬 Кибер-Алхимик Разума"
+        "Квантовый Самурай Матрицы",
+        "Неоновый Био-Шаман",
+        "Дракон Темной Материи",
+        "Призрак Нулевого Байта",
+        "Кибер-Алхимик Разума"
     )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "forge_glow")
-    val pulseGlow by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_glow"
-    )
+    val motionEnabled = rememberMotionEnabled()
+    val pulseGlow = if (motionEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "forge_glow")
+        infiniteTransition.animateFloat(
+            initialValue = 0.4f,
+            targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulse_glow"
+        ).value
+    } else {
+        0.7f
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF050811))
-            .padding(horizontal = 14.dp)
+            .background(c.ink)
+            .padding(horizontal = Space.lg)
+            .verticalScroll(rememberScrollState())
             .testTag("ai_arcana_forge_screen")
     ) {
-        // Header Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 10.dp),
+                .padding(vertical = Space.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
                 if (onBack != null) {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(48.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = c.textHigh
                         )
                     }
                 }
                 Column {
                     Text(
                         text = if (lang == "ru") "ГЕНЕРАТИВНАЯ КУЗНИЦА" else "GEMINI ARCANA FORGE",
-                        color = Color(0xFF00F5FF),
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
+                        color = NeonCyan,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontFamily = IbmPlexMonoFontFamily,
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = if (lang == "ru") "Синтез уникальных Арканов через нейросеть" else "Neural card generation with Gemini AI",
-                        color = Color.Gray,
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace
+                        text = if (lang == "ru") "Синтез уникальных Арканов" else "Neural card generation with Gemini AI",
+                        color = c.textMid,
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
 
-            // AI Status Badge
             Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = Color(0xFF10192A),
-                border = BorderStroke(1.dp, Color(0xFF00F5FF).copy(alpha = 0.5f))
+                shape = CyberShapes.chip,
+                color = c.panelRaised,
+                border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.5f))
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = Space.sm, vertical = Space.xs),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Space.xs)
                 ) {
                     Box(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF00FF66))
+                            .background(c.emeraldGlow)
                     )
                     Text(
                         text = "GEMINI CORE",
-                        fontSize = 9.sp,
-                        color = Color(0xFF00F5FF),
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        style = MaterialTheme.typography.labelMedium,
+                        color = NeonCyan
                     )
                 }
             }
         }
 
-        // Concept Prompt Input
         OutlinedTextField(
             value = userConcept,
             onValueChange = { userConcept = it },
@@ -147,42 +190,33 @@ fun AiArcanaForgeScreen(
             placeholder = { Text(if (lang == "ru") "Опишите стиль, образ, стихию или роль..." else "Describe archetype, element, lore...") },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .padding(vertical = Space.xs),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF00F5FF),
-                unfocusedBorderColor = Color.DarkGray
+                focusedBorderColor = NeonCyan,
+                unfocusedBorderColor = c.goldAntique.copy(alpha = 0.35f),
+                focusedTextColor = c.textHigh,
+                unfocusedTextColor = c.textHigh
             )
         )
 
-        // Suggestion Chips
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(vertical = Space.sm),
+            horizontalArrangement = Arrangement.spacedBy(Space.sm)
         ) {
             items(presetSuggestions) { suggestion ->
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF0C1322),
-                    border = BorderStroke(1.dp, Color(0x3300F5FF)),
-                    modifier = Modifier.clickable {
+                CyberChip(
+                    label = suggestion,
+                    selected = userConcept == suggestion,
+                    onClick = {
                         CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.CLICK)
                         userConcept = suggestion
                     }
-                ) {
-                    Text(
-                        text = suggestion,
-                        fontSize = 10.sp,
-                        color = Color.LightGray,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
+                )
             }
         }
 
-        // Generate Action Button
         Button(
             onClick = {
                 if (userConcept.isNotBlank() && !isGenerating) {
@@ -198,41 +232,38 @@ fun AiArcanaForgeScreen(
                 }
             },
             enabled = userConcept.isNotBlank() && !isGenerating,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00F5FF)),
+            colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 6.dp)
-                .height(44.dp),
-            shape = RoundedCornerShape(8.dp)
+                .padding(vertical = Space.sm)
+                .heightIn(min = 48.dp),
+            shape = CyberShapes.control
         ) {
             if (isGenerating) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
-                    color = Color.Black,
+                    color = c.ink,
                     strokeWidth = 2.dp
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(Space.sm))
                 Text(
                     text = if (lang == "ru") "НЕЙРО-СИНТЕЗ..." else "SYNTHESIZING...",
-                    color = Color.Black,
-                    fontWeight = FontWeight.Black,
-                    fontFamily = FontFamily.Monospace
+                    color = c.ink,
+                    style = MaterialTheme.typography.labelLarge
                 )
             } else {
-                Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Black)
-                Spacer(modifier = Modifier.width(6.dp))
+                Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, tint = c.ink)
+                Spacer(modifier = Modifier.width(Space.xs))
                 Text(
                     text = if (lang == "ru") "СИНТЕЗИРОВАТЬ АРКАН В КУЗНИЦЕ" else "FORGE NEURAL ARCANA",
-                    color = Color.Black,
-                    fontWeight = FontWeight.Black,
-                    fontFamily = FontFamily.Monospace
+                    color = c.ink,
+                    style = MaterialTheme.typography.labelLarge
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(Space.xs))
 
-        // Generated Card Holographic Display
         generatedCard?.let { card ->
             val elemAffinity = when (card.element.uppercase()) {
                 "BIO" -> ElementAffinity.BIO
@@ -241,170 +272,169 @@ fun AiArcanaForgeScreen(
                 else -> ElementAffinity.CYBER
             }
 
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF0B1020),
-                border = BorderStroke(1.5.dp, elemAffinity.color.copy(alpha = pulseGlow)),
+            CyberPanel(
+                borderColor = elemAffinity.color.copy(alpha = pulseGlow),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp)
+                    .padding(vertical = Space.xs)
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    // Card Top Bar: Element, Cost, Rarity
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Space.xs)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(text = elemAffinity.symbol, fontSize = 20.sp)
-                            Text(
-                                text = "${elemAffinity.name} • ${card.rarity.uppercase()}",
-                                color = elemAffinity.color,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFFFB800).copy(alpha = 0.2f),
-                            border = BorderStroke(1.dp, Color(0xFFFFB800))
-                        ) {
-                            Text(
-                                text = "${card.energyCost} RAM ⚡",
-                                color = Color(0xFFFFB800),
-                                fontWeight = FontWeight.Black,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Title & Archetype
-                    Text(
-                        text = card.name,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = card.traditionalName,
-                        fontSize = 12.sp,
-                        color = Color.LightGray
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Combat Stats
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFFFF5252).copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, Color(0xFFFF5252)),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("⚔ ATK", fontSize = 11.sp, color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
-                                Text("${card.power}", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Black)
-                            }
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFF00FF66).copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, Color(0xFF00FF66)),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("🛡 DEF", fontSize = 11.sp, color = Color(0xFF00FF66), fontWeight = FontWeight.Bold)
-                                Text("${card.defense}", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Black)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Ability Box
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFF11172A),
-                        border = BorderStroke(1.dp, Color(0x33FFFFFF)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            Text(
-                                text = "⚡ ${card.abilityTitle}",
-                                color = elemAffinity.color,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            Text(
-                                text = card.abilityDescription,
-                                color = Color.White,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Lore
-                    Text(
-                        text = "«${card.lore}»",
-                        fontSize = 11.sp,
-                        color = Color.LightGray,
-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Save / Add to Deck Action
-                    Button(
-                        onClick = {
-                            CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.COMBAT_VICTORY)
-                            isSavedToCollection = true
-                            viewModel.addWeedCredits(100)
-                        },
-                        enabled = !isSavedToCollection,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isSavedToCollection) Color(0xFF00FF66) else Color(0xFFFFD700)
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
+                        Text(text = elemAffinity.symbol, style = MaterialTheme.typography.titleLarge)
                         Text(
-                            text = if (isSavedToCollection) {
-                                if (lang == "ru") "✓ СОХРАНЕНО В БАЗУ АРКАНОВ (+100 WEED)" else "✓ SAVED TO ARCANA VAULT (+100 WEED)"
-                            } else {
-                                if (lang == "ru") "СОХРАНИТЬ В БОЕВУЮ КОЛОДУ" else "SAVE TO BATTLE ROSTER"
-                            },
-                            color = Color.Black,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
+                            text = "${elemAffinity.name} • ${card.rarity.uppercase()}",
+                            color = elemAffinity.color,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontFamily = IbmPlexMonoFontFamily
                         )
                     }
+
+                    Surface(
+                        shape = CyberShapes.chip,
+                        color = NeonAmber.copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, NeonAmber)
+                    ) {
+                        Text(
+                            text = "${card.energyCost} RAM",
+                            color = NeonAmber,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontFamily = IbmPlexMonoFontFamily,
+                            modifier = Modifier.padding(horizontal = Space.sm, vertical = Space.xs)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(Space.sm))
+
+                Text(
+                    text = card.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontFamily = IbmPlexMonoFontFamily,
+                    color = c.textHigh
+                )
+                Text(
+                    text = card.traditionalName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMid
+                )
+
+                Spacer(modifier = Modifier.height(Space.sm))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Space.md)
+                ) {
+                    Surface(
+                        shape = CyberShapes.chip,
+                        color = c.danger.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, c.danger),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(Space.sm),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Bolt, contentDescription = null, tint = c.danger, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(Space.xs))
+                                Text("ATK", style = MaterialTheme.typography.labelMedium, color = c.danger)
+                            }
+                            Text("${card.power}", style = MaterialTheme.typography.titleSmall, color = c.textHigh)
+                        }
+                    }
+
+                    Surface(
+                        shape = CyberShapes.chip,
+                        color = c.emeraldGlow.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, c.emeraldGlow),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(Space.sm),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Shield, contentDescription = null, tint = c.emeraldGlow, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(Space.xs))
+                                Text("DEF", style = MaterialTheme.typography.labelMedium, color = c.emeraldGlow)
+                            }
+                            Text("${card.defense}", style = MaterialTheme.typography.titleSmall, color = c.textHigh)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(Space.md))
+
+                Surface(
+                    shape = CyberShapes.chip,
+                    color = c.panelRaised,
+                    border = BorderStroke(1.dp, c.goldAntique.copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(Space.sm)) {
+                        Text(
+                            text = card.abilityTitle,
+                            color = elemAffinity.color,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontFamily = IbmPlexMonoFontFamily
+                        )
+                        Spacer(modifier = Modifier.height(Space.xxs))
+                        Text(
+                            text = card.abilityDescription,
+                            color = c.textHigh,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(Space.sm))
+
+                Text(
+                    text = "«${card.lore}»",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMid,
+                    fontStyle = FontStyle.Italic
+                )
+
+                Spacer(modifier = Modifier.height(Space.md))
+
+                Button(
+                    onClick = {
+                        CyberNoirSynthPlayer.triggerFX(CyberNoirSynthPlayer.FXType.COMBAT_VICTORY)
+                        isSavedToCollection = true
+                        viewModel.addWeedCredits(100)
+                    },
+                    enabled = !isSavedToCollection,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSavedToCollection) c.emeraldGlow else c.goldLeaf
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
+                    shape = CyberShapes.control
+                ) {
+                    if (isSavedToCollection) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = c.ink, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(Space.xs))
+                    }
+                    Text(
+                        text = if (isSavedToCollection) {
+                            if (lang == "ru") "СОХРАНЕНО В БАЗУ АРКАНОВ (+100 WEED)" else "SAVED TO ARCANA VAULT (+100 WEED)"
+                        } else {
+                            if (lang == "ru") "СОХРАНИТЬ В БОЕВУЮ КОЛОДУ" else "SAVE TO BATTLE ROSTER"
+                        },
+                        color = c.ink,
+                        style = MaterialTheme.typography.labelLarge
+                    )
                 }
             }
         }

@@ -1,61 +1,66 @@
 package com.example.ui.components
 
-import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.audio.CyberRadioPlayer
-import com.example.audio.RadioStation
+import com.example.ui.theme.*
 
 @Composable
 fun CyberRadioMiniBar(
     modifier: Modifier = Modifier,
+    systemLanguage: String = "en",
     onOpenConsole: () -> Unit
 ) {
     val state by CyberRadioPlayer.state.collectAsStateWithLifecycle()
     val station = state.currentStation
     val isPlaying = state.isPlaying
     val isBuffering = state.isBuffering
+    val c = Cyber.colors
+    val isRu = systemLanguage in listOf("ru", "uk")
 
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = Color(0xF2090D1A),
-        border = BorderStroke(1.dp, station.accentColor.copy(alpha = if (isPlaying) 0.8f else 0.3f)),
+        onClick = onOpenConsole,
+        shape = CyberShapes.card,
+        color = c.panel.copy(alpha = 0.95f),
+        border = BorderStroke(1.dp, station.accentColor.copy(alpha = if (isPlaying) 0.8f else 0.35f)),
         shadowElevation = if (isPlaying) 8.dp else 2.dp,
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onOpenConsole() }
+            .heightIn(min = 56.dp)
             .testTag("cyber_radio_mini_bar")
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 7.dp),
+                .padding(horizontal = Space.md, vertical = Space.xs),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -63,59 +68,62 @@ fun CyberRadioMiniBar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                // Radio Pulse Icon
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(34.dp)
                         .clip(CircleShape)
                         .background(station.accentColor.copy(alpha = 0.2f))
                         .border(1.dp, station.accentColor, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = station.icon, fontSize = 14.sp)
+                    Text(
+                        text = station.icon,
+                        style = MaterialTheme.typography.titleSmall
+                    )
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(Space.sm))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = station.name,
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontFamily = IbmPlexMonoFontFamily,
+                            color = c.textHigh,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(Space.xs))
                         if (isPlaying) {
                             Box(
                                 modifier = Modifier
                                     .size(6.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF00FF66))
+                                    .background(EmeraldPure)
                             )
                         }
                     }
                     Text(
-                        text = if (isBuffering) "ПОДКЛЮЧЕНИЕ К ПОТОКУ DI.FM..." else station.genre,
-                        color = if (isBuffering) Color(0xFFFFB800) else Color.Gray,
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
+                        text = if (isBuffering) {
+                            if (isRu) "ПОДКЛЮЧЕНИЕ К ПОТОКУ..." else "CONNECTING TO STREAM..."
+                        } else {
+                            station.genre
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isBuffering) NeonAmber else c.textMid,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            // Compact Equalizer Wave
             Row(
                 modifier = Modifier
                     .width(42.dp)
                     .height(22.dp)
-                    .padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    .padding(horizontal = Space.xs),
+                horizontalArrangement = Arrangement.spacedBy(Space.xxs),
                 verticalAlignment = Alignment.Bottom
             ) {
                 state.visualizerBars.take(6).forEach { barHeight ->
@@ -123,19 +131,18 @@ fun CyberRadioMiniBar(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(barHeight.coerceIn(0.15f, 1f))
-                            .clip(RoundedCornerShape(2.dp))
+                            .clip(CyberShapes.chip)
                             .background(station.accentColor)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(Space.sm))
 
-            // Play / Pause Button
             IconButton(
                 onClick = { CyberRadioPlayer.togglePlayPause() },
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(48.dp)
                     .background(station.accentColor.copy(alpha = 0.2f), CircleShape)
                     .border(1.dp, station.accentColor, CircleShape)
             ) {
@@ -148,9 +155,9 @@ fun CyberRadioMiniBar(
                 } else {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause",
+                        contentDescription = if (isRu) "Пауза / Воспроизведение" else "Play / Pause",
                         tint = station.accentColor,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -158,26 +165,33 @@ fun CyberRadioMiniBar(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CyberRadioConsoleDialog(
+    systemLanguage: String = "en",
     onDismiss: () -> Unit
 ) {
     val state by CyberRadioPlayer.state.collectAsStateWithLifecycle()
     val station = state.currentStation
     val isPlaying = state.isPlaying
     val isBuffering = state.isBuffering
+    val c = Cyber.colors
+    val isRu = systemLanguage in listOf("ru", "uk")
 
-    val infiniteTransition = rememberInfiniteTransition(label = "radio_glow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow"
-    )
+    val motionEnabled = rememberMotionEnabled()
+    val glowAlpha = if (motionEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "radio_glow")
+        infiniteTransition.animateFloat(
+            initialValue = 0.4f,
+            targetValue = 0.9f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1400, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "glow"
+        ).value
+    } else {
+        0.65f
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -187,15 +201,15 @@ fun CyberRadioConsoleDialog(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
                 .fillMaxHeight(0.88f)
-                .clip(RoundedCornerShape(20.dp))
-                .border(1.5.dp, station.accentColor.copy(alpha = glowAlpha), RoundedCornerShape(20.dp))
+                .clip(CyberShapes.sheet)
+                .border(1.5.dp, station.accentColor.copy(alpha = glowAlpha), CyberShapes.sheet)
                 .testTag("cyber_radio_console_dialog"),
-            color = Color(0xFF04060E)
+            color = VoidNight
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .padding(Space.lg)
             ) {
                 // Header
                 Row(
@@ -206,58 +220,60 @@ fun CyberRadioConsoleDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF0E1528))
-                                .border(1.dp, Color(0xFF00F5FF).copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+                                .size(36.dp)
+                                .clip(CyberShapes.chip)
+                                .background(c.panelRaised)
+                                .border(1.dp, NeonCyan.copy(alpha = 0.5f), CyberShapes.chip),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("📻", fontSize = 16.sp)
+                            Icon(
+                                imageVector = Icons.Default.Radio,
+                                contentDescription = null,
+                                tint = NeonCyan,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(Space.md))
                         Column {
                             Text(
-                                text = "CYBERNETIC RADIO",
-                                color = Color(0xFF00F5FF),
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 1.sp
+                                text = if (isRu) "КИБЕР-РАДИО" else "CYBERNETIC RADIO",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontFamily = IbmPlexMonoFontFamily,
+                                color = NeonCyan
                             )
                             Text(
-                                text = "LIVE DI.FM & SYNTHWAVE STREAM",
-                                color = Color.Gray,
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Monospace
+                                text = if (isRu) "ПОТОКИ SYNTHWAVE И ELECTRONIC" else "LIVE DI.FM & SYNTHWAVE STREAM",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = c.textMid
                             )
                         }
                     }
 
                     IconButton(
                         onClick = onDismiss,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = Color.LightGray
+                            contentDescription = if (isRu) "Закрыть" else "Close",
+                            tint = c.textHigh
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(Space.md))
 
                 // Now Playing Hero Card
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0xFF080D1D),
+                    shape = CyberShapes.card,
+                    color = VoidSurface,
                     border = BorderStroke(1.dp, station.accentColor.copy(alpha = 0.7f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp)
+                            .padding(Space.md)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -268,71 +284,76 @@ fun CyberRadioConsoleDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text(
-                                    text = station.icon,
-                                    fontSize = 28.sp,
+                                Box(
                                     modifier = Modifier
-                                        .padding(end = 12.dp)
-                                        .background(station.accentColor.copy(alpha = 0.15f), CircleShape)
-                                        .padding(8.dp)
-                                )
+                                        .padding(end = Space.md)
+                                        .size(48.dp)
+                                        .background(station.accentColor.copy(alpha = 0.15f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = station.icon,
+                                        style = MaterialTheme.typography.headlineMedium
+                                    )
+                                }
                                 Column {
                                     Text(
                                         text = station.name,
-                                        color = Color.White,
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontFamily = IbmPlexMonoFontFamily,
+                                        color = c.textHigh,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = station.genre,
-                                        color = station.accentColor,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = station.accentColor
                                     )
                                 }
                             }
 
-                            // Stream Quality Badge
                             Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (isPlaying) Color(0xFF002914) else Color(0xFF1E1E28),
-                                border = BorderStroke(1.dp, if (isPlaying) Color(0xFF00FF66) else Color.DarkGray)
+                                shape = CyberShapes.chip,
+                                color = if (isPlaying) EmeraldPure.copy(alpha = 0.16f) else c.panelRaised,
+                                border = BorderStroke(1.dp, if (isPlaying) EmeraldPure else c.goldAntique.copy(alpha = 0.35f))
                             ) {
                                 Text(
-                                    text = if (isPlaying) "LIVE • ${station.bitrate}" else if (isBuffering) "CONNECTING" else "READY",
-                                    color = if (isPlaying) Color(0xFF00FF66) else if (isBuffering) Color(0xFFFFB800) else Color.Gray,
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    text = when {
+                                        isPlaying -> "LIVE • ${station.bitrate}"
+                                        isBuffering -> if (isRu) "ПОДКЛ." else "CONNECTING"
+                                        else -> if (isRu) "ГОТОВ" else "READY"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = when {
+                                        isPlaying -> EmeraldPure
+                                        isBuffering -> NeonAmber
+                                        else -> c.textMid
+                                    },
+                                    modifier = Modifier.padding(horizontal = Space.sm, vertical = Space.xs)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(Space.sm))
 
                         Text(
                             text = station.description,
-                            color = Color(0xFFCCCCDD),
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textMid
                         )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(Space.md))
 
                         // Full 12-Band Equalizer Spectrum
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp)
-                                .background(Color(0xFF04060D), RoundedCornerShape(8.dp))
-                                .border(1.dp, Color(0x15FFFFFF), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                .background(c.ink, CyberShapes.chip)
+                                .border(1.dp, c.goldAntique.copy(alpha = 0.18f), CyberShapes.chip)
+                                .padding(horizontal = Space.md, vertical = Space.xs),
+                            horizontalArrangement = Arrangement.spacedBy(Space.xs),
                             verticalAlignment = Alignment.Bottom
                         ) {
                             state.visualizerBars.forEach { height ->
@@ -340,7 +361,7 @@ fun CyberRadioConsoleDialog(
                                     modifier = Modifier
                                         .weight(1f)
                                         .fillMaxHeight(height.coerceIn(0.12f, 1f))
-                                        .clip(RoundedCornerShape(3.dp))
+                                        .clip(CyberShapes.chip)
                                         .background(
                                             Brush.verticalGradient(
                                                 listOf(station.accentColor, station.accentColor.copy(alpha = 0.4f))
@@ -350,98 +371,117 @@ fun CyberRadioConsoleDialog(
                             }
                         }
 
-                        // Error Banner if stream drops
                         state.errorMessage?.let { err ->
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "⚠️ $err",
-                                color = Color(0xFFFF5252),
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
+                            Spacer(modifier = Modifier.height(Space.xs))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = c.danger,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(Space.xs))
+                                Text(
+                                    text = err,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = c.danger
+                                )
+                            }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(Space.md))
 
-                        // Main Playback Controls
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Prev Button
                             IconButton(
                                 onClick = { CyberRadioPlayer.prevStation() },
                                 modifier = Modifier
-                                    .size(42.dp)
-                                    .background(Color(0xFF0F1524), CircleShape)
-                                    .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                    .size(48.dp)
+                                    .background(c.panelRaised, CircleShape)
+                                    .border(1.dp, c.goldAntique.copy(alpha = 0.35f), CircleShape)
                             ) {
-                                Icon(Icons.Default.SkipPrevious, contentDescription = "Prev", tint = Color.White)
+                                Icon(
+                                    imageVector = Icons.Default.SkipPrevious,
+                                    contentDescription = if (isRu) "Предыдущая" else "Previous",
+                                    tint = c.textHigh
+                                )
                             }
 
-                            // Big Play / Pause Button
                             Button(
                                 onClick = { CyberRadioPlayer.togglePlayPause() },
                                 shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = station.accentColor),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = station.accentColor,
+                                    contentColor = InkDeep
+                                ),
                                 contentPadding = PaddingValues(0.dp),
                                 modifier = Modifier.size(54.dp)
                             ) {
                                 if (isBuffering) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(26.dp),
-                                        color = Color.Black,
+                                        color = InkDeep,
                                         strokeWidth = 3.dp
                                     )
                                 } else {
                                     Icon(
                                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                        contentDescription = "Play/Pause",
-                                        tint = Color.Black,
+                                        contentDescription = if (isRu) "Пауза / Воспроизведение" else "Play / Pause",
                                         modifier = Modifier.size(32.dp)
                                     )
                                 }
                             }
 
-                            // Stop Button
                             IconButton(
                                 onClick = { CyberRadioPlayer.stop() },
                                 modifier = Modifier
-                                    .size(42.dp)
-                                    .background(Color(0xFF0F1524), CircleShape)
-                                    .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                    .size(48.dp)
+                                    .background(c.panelRaised, CircleShape)
+                                    .border(1.dp, c.goldAntique.copy(alpha = 0.35f), CircleShape)
                             ) {
-                                Icon(Icons.Default.Stop, contentDescription = "Stop", tint = Color(0xFFFF5252))
+                                Icon(
+                                    imageVector = Icons.Default.Stop,
+                                    contentDescription = if (isRu) "Стоп" else "Stop",
+                                    tint = c.danger
+                                )
                             }
 
-                            // Next Button
                             IconButton(
                                 onClick = { CyberRadioPlayer.nextStation() },
                                 modifier = Modifier
-                                    .size(42.dp)
-                                    .background(Color(0xFF0F1524), CircleShape)
-                                    .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                    .size(48.dp)
+                                    .background(c.panelRaised, CircleShape)
+                                    .border(1.dp, c.goldAntique.copy(alpha = 0.35f), CircleShape)
                             ) {
-                                Icon(Icons.Default.SkipNext, contentDescription = "Next", tint = Color.White)
+                                Icon(
+                                    imageVector = Icons.Default.SkipNext,
+                                    contentDescription = if (isRu) "Следующая" else "Next",
+                                    tint = c.textHigh
+                                )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(Space.sm))
 
-                        // Volume Control Row
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 4.dp),
+                                .padding(horizontal = Space.xs),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(Space.sm)
                         ) {
                             Icon(
-                                imageVector = if (state.volume > 0f) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-                                contentDescription = "Volume",
-                                tint = Color.Gray,
-                                modifier = Modifier.size(16.dp)
+                                imageVector = if (state.volume > 0f) {
+                                    Icons.AutoMirrored.Filled.VolumeUp
+                                } else {
+                                    Icons.AutoMirrored.Filled.VolumeOff
+                                },
+                                contentDescription = if (isRu) "Громкость" else "Volume",
+                                tint = c.textMid,
+                                modifier = Modifier.size(18.dp)
                             )
                             Slider(
                                 value = state.volume,
@@ -450,59 +490,59 @@ fun CyberRadioConsoleDialog(
                                 colors = SliderDefaults.colors(
                                     thumbColor = station.accentColor,
                                     activeTrackColor = station.accentColor,
-                                    inactiveTrackColor = Color.DarkGray
+                                    inactiveTrackColor = c.panelRaised
                                 )
                             )
                             Text(
                                 text = "${(state.volume * 100).toInt()}%",
-                                color = Color.Gray,
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.width(32.dp)
+                                style = MaterialTheme.typography.labelSmall,
+                                color = c.textMid,
+                                modifier = Modifier.width(42.dp)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(Space.md))
 
-                // Station Channel Selector List
                 Text(
-                    text = "КАНАЛЫ ЭЛЕКТРОННОГО РАДИО (${CyberRadioPlayer.stations.size}):",
-                    color = Color.LightGray,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 6.dp)
+                    text = if (isRu) {
+                        "КАНАЛЫ ЭЛЕКТРОННОГО РАДИО (${CyberRadioPlayer.stations.size}):"
+                    } else {
+                        "ELECTRONIC RADIO CHANNELS (${CyberRadioPlayer.stations.size}):"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    fontFamily = IbmPlexMonoFontFamily,
+                    color = c.textMid,
+                    modifier = Modifier.padding(bottom = Space.xs)
                 )
 
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(Space.sm)
                 ) {
                     items(CyberRadioPlayer.stations) { st ->
                         val isSelected = st.id == station.id
                         val isCurrentPlaying = isSelected && isPlaying
 
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) Color(0xFF10162B) else Color(0xFF080C16),
+                            onClick = { CyberRadioPlayer.play(st) },
+                            shape = CyberShapes.cardCompact,
+                            color = if (isSelected) c.panelRaised else c.panel,
                             border = BorderStroke(
                                 1.dp,
-                                if (isSelected) st.accentColor else Color(0x22FFFFFF)
+                                if (isSelected) st.accentColor else c.goldAntique.copy(alpha = 0.2f)
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    CyberRadioPlayer.play(st)
-                                }
+                                .heightIn(min = 56.dp)
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(10.dp),
+                                    .padding(Space.md),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -510,20 +550,22 @@ fun CyberRadioConsoleDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text(text = st.icon, fontSize = 18.sp)
-                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = st.icon,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Spacer(modifier = Modifier.width(Space.sm))
                                     Column {
                                         Text(
                                             text = st.name,
-                                            color = if (isSelected) Color.White else Color(0xFFD0D0E0),
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            fontSize = 13.sp,
-                                            fontFamily = FontFamily.Monospace
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontFamily = IbmPlexMonoFontFamily,
+                                            color = if (isSelected) c.textHigh else c.textMid
                                         )
                                         Text(
                                             text = st.genre,
-                                            color = if (isSelected) st.accentColor else Color.Gray,
-                                            fontSize = 10.sp,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (isSelected) st.accentColor else c.textMid,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -535,7 +577,7 @@ fun CyberRadioConsoleDialog(
                                         modifier = Modifier
                                             .size(8.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFF00FF66))
+                                            .background(EmeraldPure)
                                     )
                                 }
                             }
